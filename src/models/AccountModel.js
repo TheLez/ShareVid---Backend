@@ -28,7 +28,7 @@ const AccountModel = sequelize.define('Account', {
         allowNull: false,
     },
     email: {
-        type: DataTypes.STRING(50),
+        type: DataTypes.STRING(255),
         allowNull: false,
         unique: true, // Đảm bảo email là duy nhất
     },
@@ -42,7 +42,7 @@ const AccountModel = sequelize.define('Account', {
         defaultValue: Sequelize.NOW, // Đặt giá trị mặc định là thời điểm hiện tại
     },
     avatar: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(2000),
         allowNull: false,
     },
     status: {

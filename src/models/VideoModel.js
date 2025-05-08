@@ -17,12 +17,12 @@ const VideoModel = sequelize.define('Video', {
         allowNull: false,
     },
     video: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(2000),
         allowNull: false,
     },
     thumbnail: {
-        type: DataTypes.STRING(255),
-        allowNull: false,
+        type: DataTypes.STRING(2000),
+        allowNull: true,
     },
     created_at: {
         type: DataTypes.DATE,
