@@ -1,4 +1,6 @@
 const { Sequelize, DataTypes } = require('sequelize');
+require('dotenv').config();
+
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
     host: process.env.DB_HOST,
     dialect: 'mysql',
@@ -27,7 +29,7 @@ const VideoModel = sequelize.define('Video', {
     created_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: Sequelize.NOW, // Giá trị mặc định là thời gian hiện tại
+        defaultValue: Sequelize.NOW,
     },
     videotype: {
         type: DataTypes.INTEGER,
@@ -56,14 +58,14 @@ const VideoModel = sequelize.define('Video', {
     userid: {
         type: DataTypes.INTEGER,
         references: {
-            model: 'account', // Tên bảng tham chiếu
-            key: 'userid',    // Khóa chính tham chiếu
+            model: 'account', // Thay đổi tên bảng tham chiếu
+            key: 'userid',
         },
-        allowNull: true, // Cho phép userid có thể là null
+        allowNull: true,
     },
 }, {
     tableName: 'video',
-    timestamps: false, // Không sử dụng các trường createdAt, updatedAt mặc định
+    timestamps: false,
 });
 
 // Xuất model

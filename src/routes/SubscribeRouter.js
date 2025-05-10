@@ -4,6 +4,7 @@ const SubscribeController = require('../controllers/SubscribeController');
 const { authMiddleware } = require('../middleware/authMiddleware');
 const { roleMiddleware } = require('../middleware/roleMiddleware');
 
+router.post('/subscribe', authMiddleware, SubscribeController.addSubscription);
 // Lấy toàn bộ subscriptions
 router.get('/get-all', authMiddleware, SubscribeController.getAllSubscriptions);
 

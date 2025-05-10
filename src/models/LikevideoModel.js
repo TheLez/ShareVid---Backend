@@ -1,8 +1,13 @@
 const { Sequelize, DataTypes } = require('sequelize');
+require('dotenv').config();
+
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
     host: process.env.DB_HOST,
     dialect: 'mysql',
 });
+
+//const AccountModel = require('./AccountModel'); // Import model User
+const VideoModel = require('./VideoModel'); // Import model Video
 
 // Định nghĩa model Likevideo
 const LikevideoModel = sequelize.define('Likevideo', {

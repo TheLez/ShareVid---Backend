@@ -2,11 +2,14 @@ const AccountService = require('../services/AccountService');
 
 const createAccount = async (req, res) => {
     try {
-        const { name, password, confirmpassword, gender, birth, email, role, created_at, avatar, status } = req.body;
+        const { name, password, confirmpassword, gender, birth, email, role, created_at, status } = req.body;
+        const file = req.file; // Lấy file ảnh từ req.file
         const reg = /^\w+([-+.']\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/;
         const checkEmail = reg.test(email);
-        if (!name || !password || !confirmpassword || !gender || !birth || !email || !created_at || !avatar) {
-            return res.status(400).json({ // Sử dụng 400 cho lỗi yêu cầu không hợp lệ
+
+        // Kiểm tra thông tin đầu vào
+        if (!name || !password || !confirmpassword || !gender || !birth || !email || !created_at) {
+            return res.status(400).json({
                 status: 'ERR',
                 message: 'Cần điền đủ thông tin'
             });
@@ -21,10 +24,12 @@ const createAccount = async (req, res) => {
                 message: 'Mật khẩu không khớp'
             });
         }
-        const response = await AccountService.createAccount(req.body);
+        console.log('Request Body:', req.body);
+        console.log('File:', req.file);
+        const response = await AccountService.createAccount(req.body, file); // Truyền cả req.body và file
         return res.status(200).json(response);
     } catch (e) {
-        return res.status(500).json({ // Sử dụng 500 cho lỗi máy chủ
+        return res.status(500).json({
             message: e.message || 'Đã xảy ra lỗi'
         });
     }
@@ -131,11 +136,30 @@ const getAccountById = async (req, res) => {
     }
 }
 
+const searchAccountByName = async (req, res) => {
+    const { name } = req.query; // Lấy tên từ query string
+
+    try {
+        const accounts = await getAccountByName(name);
+        return res.status(200).json({
+            status: 'OK',
+            message: 'Tìm kiếm tài khoản thành công',
+            data: accounts,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            status: 'ERROR',
+            message: error.message,
+        });
+    }
+};
+
 module.exports = {
     getAllAccount,
     getAccountById,
     createAccount,
     loginAccount,
     updateAccount,
-    deleteAccount
+    deleteAccount,
+    searchAccountByName
 }

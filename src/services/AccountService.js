@@ -1,57 +1,65 @@
 const AccountModel = require('../models/AccountModel');
+const VideoModel = require('../models/VideoModel');
+const SubscribeModel = require('../models/SubscribeModel');
 const bcrypt = require('bcrypt');
 const { generalAccessToken, generalRefreshToken } = require('./JwtService');
+const fs = require('fs');
+const path = require('path');
+const s3 = require('../config/awsConfig');
+const multer = require('multer');
 
-const createAccount = (newAccount) => {
-    return new Promise(async (resolve, reject) => {
-        const { name, password, confirmpassword, gender, birth, email, role, created_at, avatar, status } = newAccount;
+const createAccount = async (newAccount, file) => {
+    const { name, password, email, role, created_at, gender, birth, status = 1 } = newAccount;
 
-        try {
-            // Kiểm tra xem email đã tồn tại hay chưa
-            const checkAccount = await AccountModel.findOne({
-                where: {
-                    email: email
-                }
-            });
+    if (!file) {
+        throw new Error('Avatar file is required');
+    }
 
-            // Nếu email đã tồn tại, trả về thông báo lỗi
-            if (checkAccount) {
-                return resolve({
-                    status: 'ERROR',
-                    message: 'Email đã tồn tại'
-                });
-            }
+    try {
+        // Kiểm tra xem email đã tồn tại hay chưa
+        const checkAccount = await AccountModel.findOne({ where: { email: email } });
 
-            // Nếu email chưa tồn tại, tiếp tục tạo tài khoản mới
-            const hash = bcrypt.hashSync(password, 10);
-            console.log('hash', hash);
-            const createAccount = await AccountModel.create({
-                name,
-                password: hash,
-                gender,
-                birth,
-                email,
-                role,
-                created_at,
-                avatar,
-                status
-            });
-
-            // Kiểm tra xem tài khoản có được tạo thành công hay không
-            if (createAccount) {
-                return resolve({
-                    status: 'OK',
-                    message: 'Tạo tài khoản thành công',
-                    data: createAccount
-                });
-            }
-
-            resolve({});
-        } catch (e) {
-            reject(e);
+        if (checkAccount) {
+            return { status: 'ERROR', message: 'Email đã tồn tại' };
         }
-    });
-}
+
+        // Tải avatar lên S3 từ bộ nhớ
+        const avatarKey = `avatars/${file.originalname}`;
+        const s3Response = await s3.upload({
+            Bucket: process.env.S3_BUCKET,
+            Key: avatarKey,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+        }).promise();
+
+        const avatarUrl = s3Response.Location;
+
+        // Hash password
+        const hash = bcrypt.hashSync(password, 10);
+
+        // Tạo tài khoản mới
+        const account = await AccountModel.create({
+            name,
+            password: hash,
+            email,
+            role,
+            created_at,
+            gender,  // Đảm bảo rằng bạn đã truyền trường gender
+            birth,   // Đảm bảo rằng bạn đã truyền trường birth
+            avatar: avatarUrl,
+            status,
+        });
+
+        return {
+            status: 'OK',
+            message: 'Tạo tài khoản thành công',
+            data: account
+        };
+    } catch (error) {
+        console.error('Error creating account:', error);
+        throw new Error('Failed to create account');
+    }
+};
 
 const loginAccount = (loginAccount) => {
     return new Promise(async (resolve, reject) => {
@@ -173,30 +181,61 @@ const getAllAccount = () => {
     });
 }
 
-const getAccountById = (userid) => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const account = await AccountModel.findOne({
-                where: {
-                    userid: userid
-                }
-            });
-            if (!account) {
-                return resolve({
-                    status: 'ERROR',
-                    message: 'Không tìm thấy tài khoản'
-                });
-            }
-            return resolve({
-                status: 'OK',
-                message: 'Lấy thông tin tài khoản thành công',
-                data: account
-            });
-        } catch (e) {
-            reject(e);
+const getAccountById = async (userid) => {
+    try {
+        const account = await AccountModel.findOne({
+            where: { userid: userid },
+            include: [{
+                model: VideoModel,
+                where: { userid: userid },
+                required: false,
+            }]
+        });
+
+        if (!account) {
+            return {
+                status: 'ERROR',
+                message: 'Không tìm thấy tài khoản'
+            };
         }
-    });
-}
+
+        const subscriberCount = await SubscribeModel.count({
+            where: { useridsub: userid }
+        });
+
+        const videoCount = await VideoModel.count({
+            where: { userid: userid }
+        });
+
+        return {
+            status: 'OK',
+            message: 'Lấy thông tin tài khoản thành công',
+            data: {
+                account,
+                subscriberCount,
+                videoCount,
+            }
+        };
+    } catch (error) {
+        console.error('Error fetching account:', error);
+        throw new Error('Failed to fetch account');
+    }
+};
+
+const getAccountByName = async (name) => {
+    try {
+        const accounts = await AccountModel.findAll({
+            where: {
+                name: {
+                    [Sequelize.Op.like]: `%${name}%`, // Tìm kiếm với điều kiện LIKE
+                },
+            },
+        });
+        return accounts;
+    } catch (error) {
+        throw new Error('Lỗi khi tìm kiếm tài khoản: ' + error.message);
+    }
+};
 
 module.exports = {
     getAllAccount,
@@ -204,5 +243,6 @@ module.exports = {
     createAccount,
     loginAccount,
     updateAccount,
-    deleteAccount
+    deleteAccount,
+    getAccountByName
 }
