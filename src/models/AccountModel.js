@@ -11,14 +11,14 @@ const AccountModel = sequelize.define('Account', {
         type: DataTypes.INTEGER,
         primaryKey: true,
         allowNull: false,
-        autoIncrement: true, // Nếu bạn muốn tự động tăng
+        autoIncrement: true,
     },
     name: {
         type: DataTypes.STRING(50),
         allowNull: false,
     },
     password: {
-        type: DataTypes.STRING(255), // Độ dài tối đa cho mật khẩu
+        type: DataTypes.STRING(255),
         allowNull: false,
     },
     gender: {
@@ -32,7 +32,7 @@ const AccountModel = sequelize.define('Account', {
     email: {
         type: DataTypes.STRING(255),
         allowNull: false,
-        unique: true, // Đảm bảo email là duy nhất
+        unique: true,
     },
     role: {
         type: DataTypes.STRING(50),
@@ -41,7 +41,7 @@ const AccountModel = sequelize.define('Account', {
     created_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: Sequelize.NOW, // Đặt giá trị mặc định là thời điểm hiện tại
+        defaultValue: Sequelize.NOW,
     },
     avatar: {
         type: DataTypes.STRING(2000),
@@ -51,9 +51,18 @@ const AccountModel = sequelize.define('Account', {
         type: DataTypes.INTEGER,
         allowNull: false,
     },
+    subscription: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+    },
+    accountdescribe: {
+        type: DataTypes.STRING(1000),
+        allowNull: true,
+        defaultValue: '', // Giá trị mặc định là chuỗi rỗng
+    },
 }, {
     tableName: 'account',
-    timestamps: false, // Không sử dụng các trường createdAt, updatedAt
+    timestamps: false,
 });
 
 // Xuất model

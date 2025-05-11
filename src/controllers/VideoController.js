@@ -48,7 +48,11 @@ const getAllVideos = async (req, res) => {
 
 const getVideoById = async (req, res) => {
     try {
-        const video = await videoService.getVideoById(req.params.videoid);
+        const videoid = req.params.videoid; // Lấy videoid từ params
+        const userid = req.user.userid; // Lấy userid từ middleware đã xác thực token
+
+        const video = await videoService.getVideoById(videoid, userid); // Truyền cả videoid và userid
+
         if (video) {
             res.json(video);
         } else {

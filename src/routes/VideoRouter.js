@@ -16,7 +16,7 @@ router.post('/upload', authMiddleware, upload.single('video'), videoController.u
 router.get('/get-all', videoController.getAllVideos);
 
 // Route lấy video theo ID: không cần xác thực
-router.get('/:videoid', videoController.getVideoById);
+router.get('/:videoid', authMiddleware, videoController.getVideoById);
 
 // Route cập nhật video: cần xác thực
 router.put('update/:videoid', authMiddleware, videoController.updateVideo);

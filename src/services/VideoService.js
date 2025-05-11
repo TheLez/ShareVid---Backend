@@ -5,7 +5,8 @@ const {
     AccountModel,
     CommentModel,
     LikevideoModel,
-    SubscribeModel
+    SubscribeModel,
+    WatchedModel,
 } = require('../models');
 
 const s3 = require('../config/awsConfig');
@@ -135,13 +136,21 @@ const getAllVideos = async () => {
     }
 };
 
-const getVideoById = async (videoid) => {
+const getVideoById = async (videoid, userid) => {
+    // Thêm bản ghi vào bảng watched
+    await WatchedModel.create({
+        userid: userid,
+        videoid: videoid,
+        // Không cần thêm created_at vì đã có defaultValue
+    });
+
+    // Tìm video theo videoid
     const video = await VideoModel.findOne({
-        where: { videoid: videoid },  // Dùng videoid thay vì id
+        where: { videoid: videoid },
         include: [
             {
                 model: AccountModel,
-                attributes: ['name', 'email', 'avatar'],
+                attributes: ['name', 'email', 'avatar', 'subscription'], // Thêm subscription
             },
             {
                 model: CommentModel,
@@ -158,27 +167,7 @@ const getVideoById = async (videoid) => {
                 required: false,
             },
         ],
-        attributes: {
-            include: [
-                // Alias rõ ràng để tránh lỗi
-                [sequelize.literal(`(
-                    SELECT COUNT(*) 
-                    FROM likevideo AS likevideos 
-                    WHERE likevideos.videoid = video.videoid
-                )`), 'likeCount'],
-                [sequelize.literal(`(
-                    SELECT COUNT(*) 
-                    FROM Subscribe AS subs 
-                    WHERE subs.useridsub = video.userid
-                )`), 'subscriberCount'],
-            ]
-        }
     });
-
-    // Kiểm tra video đã tồn tại hay chưa
-    if (!video) {
-        throw new Error('Video not found');
-    }
 
     return video;
 };

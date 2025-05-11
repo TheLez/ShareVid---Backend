@@ -3,13 +3,12 @@ const VideoModel = require('../models/VideoModel');
 const SubscribeModel = require('../models/SubscribeModel');
 const bcrypt = require('bcrypt');
 const { generalAccessToken, generalRefreshToken } = require('./JwtService');
-const fs = require('fs');
-const path = require('path');
 const s3 = require('../config/awsConfig');
-const multer = require('multer');
+const Sequelize = require('sequelize');
 
 const createAccount = async (newAccount, file) => {
-    const { name, password, email, role, created_at, gender, birth, status = 1 } = newAccount;
+    const { name, password, email, role, gender, birth, subscription, accountdescribe = '' } = newAccount;
+    const status = 1; // Mặc định status là 1
 
     if (!file) {
         throw new Error('Avatar file is required');
@@ -43,11 +42,13 @@ const createAccount = async (newAccount, file) => {
             password: hash,
             email,
             role,
-            created_at,
-            gender,  // Đảm bảo rằng bạn đã truyền trường gender
-            birth,   // Đảm bảo rằng bạn đã truyền trường birth
+            created_at: new Date(), // Lấy thời gian hiện tại
+            gender,
+            birth,
             avatar: avatarUrl,
             status,
+            subscription,
+            accountdescribe,
         });
 
         return {
@@ -63,23 +64,21 @@ const createAccount = async (newAccount, file) => {
 
 const loginAccount = (loginAccount) => {
     return new Promise(async (resolve, reject) => {
-        const { name, password, confirmpassword, gender, birth, email, role, created_at, avatar, status } = loginAccount;
+        const { email, password } = loginAccount;
 
         try {
             // Kiểm tra xem email đã tồn tại hay chưa
             const checkAccount = await AccountModel.findOne({
-                where: {
-                    email: email
-                }
+                where: { email: email }
             });
 
-            // Nếu email đã tồn tại, trả về thông báo lỗi
-            if (checkAccount === null) {
+            if (!checkAccount) {
                 return resolve({
                     status: 'ERROR',
                     message: 'Không tìm thấy tài khoản'
                 });
             }
+
             const comparePassword = bcrypt.compareSync(password, checkAccount.password);
             if (!comparePassword) {
                 return resolve({
@@ -87,12 +86,14 @@ const loginAccount = (loginAccount) => {
                     message: 'Mật khẩu không đúng'
                 });
             }
+
             if (checkAccount.status === 0) {
                 return resolve({
                     status: 'ERROR',
                     message: 'Tài khoản đã bị khóa'
                 });
             }
+
             const access_token = await generalAccessToken({
                 userid: checkAccount.userid,
                 role: checkAccount.role,
@@ -108,16 +109,15 @@ const loginAccount = (loginAccount) => {
                 message: 'Đăng nhập thành công',
                 access_token,
                 refresh_token
-            })
+            });
         } catch (e) {
             reject(e);
         }
     });
-}
+};
 
 const updateAccount = async (userid, updateData) => {
     try {
-        // Cập nhật thông tin tài khoản trong cơ sở dữ liệu
         const [updatedCount] = await AccountModel.update(updateData, {
             where: { userid: userid }
         });
@@ -129,7 +129,6 @@ const updateAccount = async (userid, updateData) => {
             };
         }
 
-        // Lấy thông tin tài khoản đã cập nhật
         const updatedAccount = await AccountModel.findOne({
             where: { userid: userid }
         });
@@ -137,7 +136,7 @@ const updateAccount = async (userid, updateData) => {
         return {
             status: 'OK',
             message: 'Cập nhật tài khoản thành công',
-            data: updatedAccount // Trả về thông tin tài khoản
+            data: updatedAccount
         };
     } catch (error) {
         throw new Error('Cập nhật tài khoản thất bại');
@@ -150,13 +149,14 @@ const deleteAccount = async (userid) => {
             where: { userid: userid }
         });
 
-        if (deletedCount === null) {
+        if (!deletedCount) {
             return {
                 status: 'ERROR',
                 message: 'Không tìm thấy tài khoản để xóa'
             };
         }
-        await AccountModel.findByIdAndDelete(userid);
+
+        await AccountModel.destroy({ where: { userid: userid } });
         return {
             status: 'OK',
             message: 'Tài khoản đã được xóa thành công'
@@ -166,20 +166,18 @@ const deleteAccount = async (userid) => {
     }
 };
 
-const getAllAccount = () => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const allAccount = await AccountModel.findAll();
-            return resolve({
-                status: 'OK',
-                message: 'Lấy danh sách tài khoản thành công',
-                data: allAccount
-            });
-        } catch (e) {
-            reject(e);
-        }
-    });
-}
+const getAllAccount = async () => {
+    try {
+        const allAccount = await AccountModel.findAll();
+        return {
+            status: 'OK',
+            message: 'Lấy danh sách tài khoản thành công',
+            data: allAccount
+        };
+    } catch (e) {
+        throw new Error('Lỗi khi lấy danh sách tài khoản: ' + e.message);
+    }
+};
 
 const getAccountById = async (userid) => {
     try {
@@ -245,4 +243,4 @@ module.exports = {
     updateAccount,
     deleteAccount,
     getAccountByName
-}
+};
