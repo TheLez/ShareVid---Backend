@@ -104,11 +104,18 @@ const loginAccount = (loginAccount) => {
                 role: checkAccount.role,
             });
 
+            // Trả về thông tin tài khoản cùng với token
             return resolve({
                 status: 'OK',
                 message: 'Đăng nhập thành công',
                 access_token,
-                refresh_token
+                refresh_token,
+                account: {
+                    id: checkAccount.userid,
+                    name: checkAccount.name, // Giả sử bạn có trường name trong model
+                    role: checkAccount.role,
+                    // Thêm các thông tin khác nếu cần
+                }
             });
         } catch (e) {
             reject(e);
