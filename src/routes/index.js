@@ -7,6 +7,7 @@ const WatchedRouter = require('./WatchedRouter');
 const LikeCommentRouter = require('./LikeCommentRouter');
 const SaveVideoRouter = require('./SaveVideoRouter');
 const NotificationRouter = require('./NotificationRouter');
+const authRouter = require('./authRouter');
 
 const routes = (app) => {
     app.use('/api/account', AccountRouter);
@@ -18,6 +19,7 @@ const routes = (app) => {
     app.use('/api/like-comment', LikeCommentRouter);
     app.use('/api/save-video', SaveVideoRouter);
     app.use('/api/notification', NotificationRouter);
+    app.use('/api/auth', authRouter);
 }
 
 module.exports = routes

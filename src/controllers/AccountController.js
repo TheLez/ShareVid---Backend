@@ -2,13 +2,13 @@ const AccountService = require('../services/AccountService');
 
 const createAccount = async (req, res) => {
     try {
-        const { name, password, confirmpassword, gender, birth, email, role } = req.body; // Không cần created_at, status
+        const { name, password, confirmpassword, gender, birth, email, role } = req.body; // Lấy role từ req.body
         const file = req.file; // Lấy file ảnh từ req.file
         const reg = /^\w+([-+.']\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/;
         const checkEmail = reg.test(email);
 
         // Kiểm tra thông tin đầu vào
-        if (!name || !password || !confirmpassword || !gender || !birth || !email || !role) {
+        if (!name || !password || !confirmpassword || !gender || !birth || !email) {
             return res.status(400).json({
                 status: 'ERR',
                 message: 'Cần điền đủ thông tin'
@@ -25,11 +25,14 @@ const createAccount = async (req, res) => {
             });
         }
 
+        // Thiết lập giá trị mặc định cho role
+        const accountRole = role || 'user'; // Mặc định là 'user' nếu không có role
+
         const response = await AccountService.createAccount({
             name,
             password,
             email,
-            role,
+            role: accountRole, // Sử dụng role đã được thiết lập
             gender,
             birth,
             accountdescribe: req.body.accountdescribe || '', // Nếu không truyền, mặc định là ''
@@ -49,7 +52,7 @@ const loginAccount = async (req, res) => {
         const reg = /^\w+([-+.']\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/;
         const checkEmail = reg.test(email);
 
-        if (!password || !email) {
+        if (!email || !password) {
             return res.status(400).json({
                 status: 'ERR',
                 message: 'Cần điền đủ thông tin'

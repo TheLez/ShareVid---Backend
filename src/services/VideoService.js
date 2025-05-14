@@ -137,12 +137,22 @@ const getAllVideos = async () => {
 };
 
 const getVideoById = async (videoid, userid) => {
-    // Thêm bản ghi vào bảng watched
-    await WatchedModel.create({
-        userid: userid,
-        videoid: videoid,
-        // Không cần thêm created_at vì đã có defaultValue
+    // Kiểm tra xem bản ghi đã tồn tại trong bảng watched hay chưa
+    const existingRecord = await WatchedModel.findOne({
+        where: { userid: userid, videoid: videoid }
     });
+
+    if (existingRecord) {
+        // Nếu đã tồn tại, cập nhật created_at thành thời gian hiện tại
+        await existingRecord.update({ created_at: new Date() });
+    } else {
+        // Nếu không tồn tại, tạo bản ghi mới
+        await WatchedModel.create({
+            userid: userid,
+            videoid: videoid,
+            // Không cần thêm created_at vì đã có defaultValue
+        });
+    }
 
     // Tìm video theo videoid
     const video = await VideoModel.findOne({

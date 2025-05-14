@@ -1,4 +1,4 @@
-const NotificationModel = require('../models/notificationModel'); // Đường dẫn tới model Notification
+const NotificationModel = require('../models/NotificationModel'); // Đường dẫn tới model Notification
 
 const getNotificationsByUserId = async (userid) => {
     return await NotificationModel.findAll({

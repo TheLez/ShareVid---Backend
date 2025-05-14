@@ -2,12 +2,12 @@ const AccountModel = require('../models/AccountModel');
 const VideoModel = require('../models/VideoModel');
 const SubscribeModel = require('../models/SubscribeModel');
 const bcrypt = require('bcrypt');
-const { generalAccessToken, generalRefreshToken } = require('./JwtService');
+const { generateAccessToken, generateRefreshToken } = require('./JwtService');
 const s3 = require('../config/awsConfig');
 const Sequelize = require('sequelize');
 
 const createAccount = async (newAccount, file) => {
-    const { name, password, email, role, gender, birth, subscription, accountdescribe = '' } = newAccount;
+    const { name, password, email, role = 'user', gender, birth, subscription = 0, accountdescribe = '' } = newAccount;
     const status = 1; // Mặc định status là 1
 
     if (!file) {
@@ -94,12 +94,12 @@ const loginAccount = (loginAccount) => {
                 });
             }
 
-            const access_token = await generalAccessToken({
+            const access_token = await generateAccessToken({
                 userid: checkAccount.userid,
                 role: checkAccount.role,
             });
 
-            const refresh_token = await generalRefreshToken({
+            const refresh_token = await generateRefreshToken({
                 userid: checkAccount.userid,
                 role: checkAccount.role,
             });
