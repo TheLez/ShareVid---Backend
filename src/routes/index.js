@@ -13,7 +13,7 @@ const routes = (app) => {
     app.use('/api/account', AccountRouter);
     app.use('/api/subscribe', SubscribeRouter);
     app.use('/api/video', VideoRouter);
-    app.use('/api/like', LikeVideoRouter);
+    app.use('/api/likevideo', LikeVideoRouter);
     app.use('/api/comment', CommentRouter);
     app.use('/api/watched', WatchedRouter);
     app.use('/api/like-comment', LikeCommentRouter);

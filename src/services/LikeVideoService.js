@@ -22,8 +22,7 @@ const getLikedVideos = async (userid) => {
     return likedVideos;
 };
 
-const addLike = async (userid, videoid, type) => {
-    // Kiểm tra xem like đã tồn tại chưa
+const addLike = async (userid, videoid, type) => { // ✅ Nhận type
     const existingLike = await LikeVideoModel.findOne({
         where: { userid, videoid }
     });
@@ -32,7 +31,6 @@ const addLike = async (userid, videoid, type) => {
         throw new Error('Like already exists');
     }
 
-    // Tạo bản ghi mới
     const newLike = await LikeVideoModel.create({
         userid,
         videoid,
@@ -56,8 +54,22 @@ const removeLike = async (userid, videoid) => {
     return { message: 'Like removed successfully' };
 };
 
+// Lấy thông tin like cho một video
+const getLikeInfoByVideoId = async (userid, videoid) => {
+    const likeInfo = await LikeVideoModel.findOne({
+        where: { userid, videoid }
+    });
+
+    if (likeInfo) {
+        return { liked: true, type: likeInfo.type }; // Trả về thông tin like
+    } else {
+        return { liked: false }; // Không có like cho video này
+    }
+};
+
 module.exports = {
     getLikedVideos,
     addLike,
     removeLike,
+    getLikeInfoByVideoId, // Thêm chức năng mới
 };

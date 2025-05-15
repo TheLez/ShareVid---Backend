@@ -1,12 +1,22 @@
 const CommentModel = require('../models/CommentModel'); // Đường dẫn tới model Comment
+const AccountModel = require('../models/AccountModel'); // Đường dẫn tới model Account
 
 const getAllComments = async () => {
-    return await CommentModel.findAll();
+    return await CommentModel.findAll({
+        include: [{
+            model: AccountModel,
+            attributes: ['name', 'avatar'] // Chọn các thuộc tính cần thiết của tài khoản
+        }]
+    });
 };
 
 const getCommentsByVideoId = async (videoid) => {
     return await CommentModel.findAll({
         where: { videoid },
+        include: [{
+            model: AccountModel,
+            attributes: ['name', 'avatar'] // Chọn các thuộc tính cần thiết của tài khoản
+        }]
     });
 };
 

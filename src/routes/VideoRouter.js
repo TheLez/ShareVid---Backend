@@ -26,4 +26,6 @@ router.delete('delete/:videoid', authMiddleware, videoController.deleteVideo);
 
 router.get('/search', videoController.searchVideo);
 
+router.post('/:videoid/increment-view', authMiddleware, videoController.incrementView);
+
 module.exports = router;

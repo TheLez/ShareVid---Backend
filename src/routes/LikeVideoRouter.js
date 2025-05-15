@@ -7,9 +7,12 @@ const { authMiddleware } = require('../middleware/authMiddleware');
 router.get('/liked', authMiddleware, LikeVideoController.getLikedVideos);
 
 // Thêm like video
-router.post('/like', authMiddleware, LikeVideoController.addLike);
+router.post('/like/:videoid', authMiddleware, LikeVideoController.addLike);
 
 // Xóa like video
 router.delete('/unlike/:videoid', authMiddleware, LikeVideoController.removeLike);
+
+// Lấy thông tin like cho một video
+router.get('/video/:videoid', authMiddleware, LikeVideoController.getLikeInfoByVideoId);
 
 module.exports = router;

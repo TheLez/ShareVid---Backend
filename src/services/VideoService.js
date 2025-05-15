@@ -115,9 +115,9 @@ const uploadVideo = async (videoFile, thumbnailFile = null, videoData) => {
 const getAllVideos = async () => {
     try {
         const videos = await VideoModel.findAll({
+            where: { status: 1 }, // Chỉ lấy video có status = 1
             include: [{
                 model: AccountModel,
-                as: 'User', // Giả sử bạn đã đặt tên alias là 'User' trong định nghĩa model
                 attributes: ['userid', 'name', 'avatar'], // Chọn các thuộc tính của người dùng cần lấy
             }],
         });
@@ -142,21 +142,21 @@ const getVideoById = async (videoid, userid) => {
         where: { userid: userid, videoid: videoid }
     });
 
-    if (existingRecord) {
-        // Nếu đã tồn tại, cập nhật created_at thành thời gian hiện tại
-        await existingRecord.update({ created_at: new Date() });
-    } else {
+    if (!existingRecord) {
         // Nếu không tồn tại, tạo bản ghi mới
         await WatchedModel.create({
             userid: userid,
             videoid: videoid,
             // Không cần thêm created_at vì đã có defaultValue
         });
+    } else {
+        // Nếu đã tồn tại, chỉ cập nhật created_at
+        await existingRecord.update({ created_at: new Date() });
     }
 
     // Tìm video theo videoid
     const video = await VideoModel.findOne({
-        where: { videoid: videoid },
+        where: { videoid: videoid, status: 1 }, // Chỉ lấy video có status = 1
         include: [
             {
                 model: AccountModel,
@@ -206,11 +206,23 @@ const searchVideoByTitle = async (title) => {
                 title: {
                     [Op.like]: `%${title}%`, // Sử dụng LIKE để tìm kiếm
                 },
+                status: 1, // Chỉ lấy video có status = 1
             },
         });
         return videos;
     } catch (error) {
         throw new Error('Lỗi khi tìm kiếm video: ' + error.message);
+    }
+};
+
+const incrementView = async (videoid) => {
+    try {
+        await VideoModel.increment('videoview', {
+            where: { videoid: videoid }
+        });
+    } catch (error) {
+        console.error("Lỗi khi cập nhật lượt xem:", error);
+        throw new Error("Không thể cập nhật lượt xem.");
     }
 };
 
@@ -220,5 +232,6 @@ module.exports = {
     getVideoById,
     updateVideo,
     deleteVideo,
-    searchVideoByTitle
+    searchVideoByTitle,
+    incrementView
 };

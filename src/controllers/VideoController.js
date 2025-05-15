@@ -118,11 +118,24 @@ const searchVideo = async (req, res) => {
     }
 };
 
+const incrementView = async (req, res) => {
+    const { videoid } = req.params;
+
+    try {
+        await videoService.incrementView(videoid);
+        return res.status(200).json({ message: "Lượt xem đã được cập nhật." });
+    } catch (error) {
+        console.error("Lỗi khi cập nhật lượt xem:", error);
+        return res.status(500).json({ message: "Không thể cập nhật lượt xem." });
+    }
+};
+
 module.exports = {
     uploadVideo,
     getAllVideos,
     getVideoById,
     updateVideo,
     deleteVideo,
-    searchVideo
+    searchVideo,
+    incrementView
 };
