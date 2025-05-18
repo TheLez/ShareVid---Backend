@@ -24,7 +24,7 @@ router.put('update/:videoid', authMiddleware, videoController.updateVideo);
 // Route xóa video: cần xác thực
 router.delete('delete/:videoid', authMiddleware, videoController.deleteVideo);
 
-router.get('/search', videoController.searchVideo);
+router.get('/get/search', authMiddleware, videoController.searchVideos);
 
 router.post('/:videoid/increment-view', authMiddleware, videoController.incrementView);
 

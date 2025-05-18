@@ -17,4 +17,6 @@ router.get('/top', authMiddleware, SubscribeController.getTopSubscriptions);
 // Xóa subscription
 router.delete('/delete-subscribe/:useridsub', authMiddleware, SubscribeController.deleteSubscription);
 
+router.get('/subscribed/:userid', authMiddleware, SubscribeController.checkSubscribe);
+
 module.exports = router;

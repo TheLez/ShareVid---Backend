@@ -15,6 +15,6 @@ router.post('/sign-up', upload.single('avatar'), accountController.createAccount
 router.post('/sign-in', accountController.loginAccount);
 router.put('/update-account/:id', authMiddleware, accountController.updateAccount);
 router.delete('/delete-account/:id', authMiddleware, accountController.deleteAccount);
-router.get('/search', accountController.searchAccountByName);
+router.get('/get/search', accountController.searchAccounts);
 
 module.exports = router;

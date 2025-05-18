@@ -112,7 +112,6 @@ const uploadVideo = async (videoFile, thumbnailFile = null, videoData) => {
     }
 };
 
-// Các phương thức còn lại không thay đổi
 const getAllVideos = async (videotype = null, page = 1, limit = 50, excludeId = null, orderByView = false) => {
     try {
         const offset = (page - 1) * limit;
@@ -156,40 +155,57 @@ const getAllVideos = async (videotype = null, page = 1, limit = 50, excludeId = 
 };
 
 const getVideoById = async (videoid, userid) => {
-    // Kiểm tra xem bản ghi đã tồn tại trong bảng watched hay chưa
-    const existingRecord = await WatchedModel.findOne({
-        where: { userid: userid, videoid: videoid }
-    });
+    try {
+        // Validate videoid
+        const parsedVideoid = parseInt(videoid);
+        if (isNaN(parsedVideoid) || parsedVideoid <= 0) {
+            throw new Error('Invalid video ID');
+        }
 
-    if (!existingRecord) {
-        // Nếu không tồn tại, tạo bản ghi mới
-        await WatchedModel.create({
-            userid: userid,
-            videoid: videoid,
-            // Không cần thêm created_at vì đã có defaultValue
+        // Kiểm tra xem bản ghi đã tồn tại trong bảng watched hay chưa
+        if (userid) {
+            const existingRecord = await WatchedModel.findOne({
+                where: { userid: userid, videoid: parsedVideoid }
+            });
+
+            if (!existingRecord) {
+                // Nếu không tồn tại, tạo bản ghi mới
+                await WatchedModel.create({
+                    userid: userid,
+                    videoid: parsedVideoid,
+                    created_at: new Date()
+                });
+            } else {
+                // Nếu đã tồn tại, chỉ cập nhật created_at
+                await existingRecord.update({ created_at: new Date() });
+            }
+        }
+
+        // Tìm video theo videoid
+        const video = await VideoModel.findOne({
+            where: { videoid: parsedVideoid, status: 1 }, // Chỉ lấy video có status = 1
+            include: [
+                {
+                    model: AccountModel,
+                    attributes: ['userid', 'name', 'email', 'avatar', 'subscription'],
+                },
+                {
+                    model: LikevideoModel,
+                    attributes: [],
+                    required: false,
+                },
+            ],
         });
-    } else {
-        // Nếu đã tồn tại, chỉ cập nhật created_at
-        await existingRecord.update({ created_at: new Date() });
+
+        if (!video) {
+            throw new Error('Video not found');
+        }
+
+        return video;
+    } catch (error) {
+        console.error(`❌ Service: Error fetching video by ID: ${error.message}`);
+        throw error;
     }
-
-    // Tìm video theo videoid
-    const video = await VideoModel.findOne({
-        where: { videoid: videoid, status: 1 }, // Chỉ lấy video có status = 1
-        include: [
-            {
-                model: AccountModel,
-                attributes: ['userid', 'name', 'email', 'avatar', 'subscription'], // Thêm subscription
-            },
-            {
-                model: LikevideoModel,
-                attributes: [], // Không lấy cụ thể
-                required: false,
-            },
-        ],
-    });
-
-    return video;
 };
 
 const updateVideo = async (videoid, data) => {
@@ -209,31 +225,99 @@ const deleteVideo = async (videoid) => {
     throw new Error('Video not found');
 };
 
-const searchVideoByTitle = async (title, page = 1, limit = 50) => {
+const searchVideos = async (query, sortBy, viewed, userid, page, limit) => {
     try {
-        const offset = (page - 1) * limit; // Tính toán offset
+        console.log(`🔍 Service: Searching videos with query=${query}, sortBy=${sortBy}, viewed=${viewed}, userid=${userid}, page=${page}, limit=${limit}`);
 
+        // Kiểm tra tham số
+        if (!query) {
+            throw new Error('Thiếu tham số query.');
+        }
+        if (!['created_at', 'videoview'].includes(sortBy)) {
+            throw new Error('Giá trị sortBy không hợp lệ.');
+        }
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+        if (isNaN(parsedPage) || parsedPage < 1 || isNaN(parsedLimit) || parsedLimit < 1) {
+            throw new Error('Trang hoặc giới hạn không hợp lệ.');
+        }
+        if (viewed !== null && (!userid || isNaN(parseInt(userid)) || parseInt(userid) <= 0)) {
+            throw new Error('ID người dùng không hợp lệ khi lọc video đã xem.');
+        }
+
+        // Xây dựng điều kiện tìm kiếm
+        const searchConditions = {
+            title: { [Op.like]: `%${query}%` },
+            status: 1
+        };
+
+        // Xây dựng include cho AccountModel
+        const include = [
+            {
+                model: AccountModel,
+                attributes: ['userid', 'name', 'avatar', 'subscription'],
+            }
+        ];
+
+        // Lọc video đã xem hoặc chưa xem
+        if (viewed !== null && userid) {
+            const viewedVideos = await WatchedModel.findAll({
+                where: { userid: parseInt(userid) },
+                attributes: ['videoid'],
+                raw: true
+            }).then(views => views.map(view => view.videoid));
+
+            if (viewed) {
+                // Lọc video đã xem
+                if (viewedVideos.length === 0) {
+                    return {
+                        data: [],
+                        total: 0,
+                        page: parsedPage,
+                        totalPages: 0
+                    };
+                }
+                searchConditions.videoid = { [Op.in]: viewedVideos };
+            } else {
+                // Lọc video chưa xem
+                if (viewedVideos.length > 0) {
+                    searchConditions.videoid = { [Op.notIn]: viewedVideos };
+                }
+                // Nếu không có video đã xem, không cần thêm điều kiện (lấy tất cả video)
+            }
+        }
+
+        // Xác định thứ tự sắp xếp
+        const sortOptions = sortBy === 'videoview' ? [['videoview', 'DESC']] : [['created_at', 'DESC']];
+
+        // Phân trang
+        const offset = (parsedPage - 1) * parsedLimit;
+
+        // Tìm kiếm video
         const { count, rows } = await VideoModel.findAndCountAll({
-            where: {
-                title: {
-                    [Op.like]: `%${title}%`, // Sử dụng LIKE để tìm kiếm
-                },
-                status: 1, // Chỉ lấy video có status = 1
-            },
-            limit: limit,
-            offset: offset,
+            where: searchConditions,
+            include,
+            order: sortOptions,
+            offset,
+            limit: parsedLimit,
+            raw: true,
+            nest: true,
+            distinct: true,
+            logging: console.log
         });
 
+        // Log để kiểm tra kết quả
+        console.log(`🔍 Service: Found ${rows.length} videos, total: ${count}, video IDs: ${rows.map(row => row.videoid).join(', ')}`);
+
         return {
-            status: 'OK',
-            message: 'Tìm kiếm video thành công',
             data: rows,
-            total: count, // Tổng số video
-            page: page,
-            totalPages: Math.ceil(count / limit), // Tổng số trang
+            total: count,
+            page: parsedPage,
+            totalPages: Math.ceil(count / parsedLimit)
         };
     } catch (error) {
-        throw new Error('Lỗi khi tìm kiếm video: ' + error.message);
+        console.error('❌ Service: Error searching videos:', error.message);
+        throw error;
     }
 };
 
@@ -267,7 +351,7 @@ const getVideosByType = async (videotype, page = 1, limit = 50, excludeId = null
             order: [
                 ['videoview', 'DESC'],
                 ['created_at', 'DESC']
-            ], // Sắp xếp mới nhất trước
+            ],
             limit,
             offset,
         });
@@ -313,14 +397,13 @@ const getVideosByUserId = async (userid, page = 1, limit = 20) => {
     return videos;
 };
 
-
 module.exports = {
     uploadVideo,
     getAllVideos,
     getVideoById,
     updateVideo,
     deleteVideo,
-    searchVideoByTitle,
+    searchVideos,
     incrementView,
     getVideosByType,
     getVideosByUserId

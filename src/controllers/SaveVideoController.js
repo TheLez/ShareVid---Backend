@@ -2,6 +2,7 @@ const {
     getAllSavedVideosByUser,
     addSavedVideo,
     removeSavedVideo,
+    checkSaved
 } = require('../services/SaveVideoService');
 
 const getAll = async (req, res) => {
@@ -50,8 +51,24 @@ const remove = async (req, res) => {
     }
 };
 
+const check = async (req, res) => {
+    try {
+        const { videoid } = req.params; // Lấy videoid từ params
+        const currentUserId = req.user.userid; // Lấy userid từ token (giả định middleware xác thực)
+
+        console.log(`🚀 Controller: Check saved status for user ${currentUserId} and video ${videoid}`);
+        const result = await checkSaved(currentUserId, videoid);
+
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('❌ Controller: Error in checkSaved:', error.message);
+        res.status(500).json({ error: 'Không thể kiểm tra trạng thái lưu video.' });
+    }
+};
+
 module.exports = {
     getAll,
     create,
     remove,
+    check
 };

@@ -1,32 +1,40 @@
-const videoService = require('../services/VideoService');
+const VideoService = require('../services/VideoService');
 
 const uploadVideo = async (req, res) => {
     try {
-        const userid = req.user.userid; // Lấy userid từ token đã xác thực
+        const userid = req.user?.userid; // Lấy userid từ token đã xác thực
+        if (!userid) {
+            return res.status(401).json({ error: 'Yêu cầu xác thực.' });
+        }
 
         if (!req.file) {
-            return res.status(400).json({ error: 'Video file is required' });
+            return res.status(400).json({ error: 'Tệp video là bắt buộc.' });
         }
 
         const videoData = {
             title: req.body.title,
-            created_at: req.body.created_at,
-            videotype: req.body.videotype || 0,
-            videoview: req.body.videoview || 0,
-            videolike: req.body.videolike || 0,
-            videodislike: req.body.videodislike || 0,
+            created_at: req.body.created_at ? new Date(req.body.created_at) : new Date(),
+            videotype: parseInt(req.body.videotype) || 0,
+            videoview: parseInt(req.body.videoview) || 0,
+            videolike: parseInt(req.body.videolike) || 0,
+            videodislike: parseInt(req.body.videodislike) || 0,
             videodescribe: req.body.videodescribe || '',
-            status: req.body.status || 1,
+            status: parseInt(req.body.status) || 1,
             userid: userid,
         };
 
+        // Kiểm tra các trường bắt buộc
+        if (!videoData.title) {
+            return res.status(400).json({ error: 'Tiêu đề video là bắt buộc.' });
+        }
+
         const thumbnail = req.body.thumbnail || null;
 
-        const video = await videoService.uploadVideo(req.file, thumbnail, videoData);
+        const video = await VideoService.uploadVideo(req.file, thumbnail, videoData);
         res.status(201).json(video);
     } catch (error) {
-        console.error('Error uploading video:', error);
-        res.status(500).json({ error: error.message });
+        console.error('❌ Controller: Error uploading video:', error.message);
+        res.status(500).json({ error: 'Không thể tải video lên.' });
     }
 };
 
@@ -34,138 +42,252 @@ const getAllVideos = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 50;
-        const videotype = req.query.type ? parseInt(req.query.type) : null; // Lấy loại video từ query
+        const videotype = req.query.type ? parseInt(req.query.type) : null;
         const excludeId = req.query.exclude ? parseInt(req.query.exclude) : null;
         const orderByView = req.query.orderByView === 'true';
 
-        // Kiểm tra loại video
+        // Kiểm tra tham số
+        if (isNaN(page) || page < 1 || isNaN(limit) || limit < 1) {
+            return res.status(400).json({ error: 'Trang hoặc giới hạn không hợp lệ.' });
+        }
         if (videotype !== null && isNaN(videotype)) {
-            return res.status(400).json({ error: 'Invalid video type' });
+            return res.status(400).json({ error: 'Loại video không hợp lệ.' });
+        }
+        if (excludeId !== null && (isNaN(excludeId) || excludeId <= 0)) {
+            return res.status(400).json({ error: 'ID loại trừ không hợp lệ.' });
         }
 
-        const videos = await videoService.getAllVideos(videotype, page, limit, excludeId, orderByView);
-        res.json(videos);
+        const videos = await VideoService.getAllVideos(videotype, page, limit, excludeId, orderByView);
+        res.status(200).json(videos);
     } catch (error) {
-        console.error('Error fetching videos:', error);
-        res.status(500).json({ error: error.message });
+        console.error('❌ Controller: Error fetching videos:', error.message);
+        res.status(500).json({ error: 'Không thể lấy danh sách video.' });
     }
 };
 
 const getVideoById = async (req, res) => {
     try {
         const videoid = req.params.videoid;
-        const userid = req.user.userid;
+        const userid = req.user?.userid; // Có thể null nếu không đăng nhập
 
-        const video = await videoService.getVideoById(videoid, userid);
+        console.log(`🚀 Controller: Fetching video with videoid=${videoid}, userid=${userid}`);
 
-        if (video) {
-            res.json(video);
-        } else {
-            res.status(404).json({ error: 'Video not found' });
+        // Kiểm tra videoid trước khi gọi service
+        const parsedVideoid = parseInt(videoid);
+        if (isNaN(parsedVideoid) || parsedVideoid <= 0) {
+            return res.status(400).json({ error: 'ID video không hợp lệ.' });
         }
+
+        const video = await VideoService.getVideoById(parsedVideoid, userid);
+
+        if (!video) {
+            return res.status(404).json({ error: 'Không tìm thấy video.' });
+        }
+
+        res.status(200).json(video);
     } catch (error) {
-        console.error('Error fetching video by ID:', error);
-        res.status(500).json({ error: error.message });
+        console.error('❌ Controller: Error fetching video by ID:', error.message);
+        if (error.message === 'Invalid video ID') {
+            return res.status(400).json({ error: 'ID video không hợp lệ.' });
+        }
+        if (error.message === 'Video not found') {
+            return res.status(404).json({ error: 'Không tìm thấy video.' });
+        }
+        res.status(500).json({ error: 'Không thể lấy thông tin video.' });
     }
 };
 
 const updateVideo = async (req, res) => {
     try {
         const videoid = req.params.videoid;
-        const video = await videoService.getVideoById(videoid);
-
-        if (video.userid !== req.user.userid) {
-            return res.status(403).json({ error: 'Bạn không có quyền cập nhật video này' });
+        const userid = req.user?.userid;
+        if (!userid) {
+            return res.status(401).json({ error: 'Yêu cầu xác thực.' });
         }
 
-        const updatedVideo = await videoService.updateVideo(videoid, req.body);
-        res.json(updatedVideo);
+        // Kiểm tra videoid
+        const parsedVideoid = parseInt(videoid);
+        if (isNaN(parsedVideoid) || parsedVideoid <= 0) {
+            return res.status(400).json({ error: 'ID video không hợp lệ.' });
+        }
+
+        const video = await VideoService.getVideoById(parsedVideoid, userid);
+        if (!video) {
+            return res.status(404).json({ error: 'Không tìm thấy video.' });
+        }
+
+        if (video.userid !== userid) {
+            return res.status(403).json({ error: 'Bạn không có quyền cập nhật video này.' });
+        }
+
+        const updatedVideo = await VideoService.updateVideo(parsedVideoid, req.body);
+        res.status(200).json(updatedVideo);
     } catch (error) {
-        console.error('Error updating video:', error);
-        res.status(500).json({ error: error.message });
+        console.error('❌ Controller: Error updating video:', error.message);
+        if (error.message === 'Invalid video ID') {
+            return res.status(400).json({ error: 'ID video không hợp lệ.' });
+        }
+        if (error.message === 'Video not found') {
+            return res.status(404).json({ error: 'Không tìm thấy video.' });
+        }
+        res.status(500).json({ error: 'Không thể cập nhật video.' });
     }
 };
 
 const deleteVideo = async (req, res) => {
     try {
         const videoid = req.params.videoid;
-        const video = await videoService.getVideoById(videoid);
-
-        if (video.userid !== req.user.userid) {
-            return res.status(403).json({ error: 'Bạn không có quyền xóa video này' });
+        const userid = req.user?.userid;
+        if (!userid) {
+            return res.status(401).json({ error: 'Yêu cầu xác thực.' });
         }
 
-        await videoService.deleteVideo(videoid);
-        res.status(204).send(); // Trả về status 204 No Content
+        // Kiểm tra videoid
+        const parsedVideoid = parseInt(videoid);
+        if (isNaN(parsedVideoid) || parsedVideoid <= 0) {
+            return res.status(400).json({ error: 'ID video không hợp lệ.' });
+        }
+
+        const video = await VideoService.getVideoById(parsedVideoid, userid);
+        if (!video) {
+            return res.status(404).json({ error: 'Không tìm thấy video.' });
+        }
+
+        if (video.userid !== userid) {
+            return res.status(403).json({ error: 'Bạn không có quyền xóa video này.' });
+        }
+
+        await VideoService.deleteVideo(parsedVideoid);
+        res.status(204).send();
     } catch (error) {
-        console.error('Error deleting video:', error);
-        res.status(500).json({ error: error.message });
+        console.error('❌ Controller: Error deleting video:', error.message);
+        if (error.message === 'Invalid video ID') {
+            return res.status(400).json({ error: 'ID video không hợp lệ.' });
+        }
+        if (error.message === 'Video not found') {
+            return res.status(404).json({ error: 'Không tìm thấy video.' });
+        }
+        res.status(500).json({ error: 'Không thể xóa video.' });
     }
 };
 
-const searchVideo = async (req, res) => {
-    const { title } = req.query; // Lấy tiêu đề từ query string
-    const page = parseInt(req.query.page) || 1; // Mặc định là trang 1
-    const limit = parseInt(req.query.limit) || 50; // Mặc định là 50 video
-
+const searchVideos = async (req, res) => {
     try {
-        const videos = await videoService.searchVideoByTitle(title, page, limit);
-        return res.status(200).json(videos);
+        const { query, sortBy = 'created_at', viewed, page = 1, limit = 20 } = req.query;
+        const currentUserId = req.user?.userid;
+
+        console.log(
+            `🚀 Controller: Search videos with query=${query}, sortBy=${sortBy}, viewed=${viewed}, page=${page}, limit=${limit}, userid=${currentUserId}`
+        );
+
+        if (!query) {
+            return res.status(400).json({ error: 'Thiếu tham số query.' });
+        }
+
+        if (!['created_at', 'videoview'].includes(sortBy)) {
+            return res.status(400).json({ error: 'Giá trị sortBy không hợp lệ.' });
+        }
+
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+        if (isNaN(parsedPage) || parsedPage < 1 || isNaN(parsedLimit) || parsedLimit < 1) {
+            return res.status(400).json({ error: 'Trang hoặc giới hạn không hợp lệ.' });
+        }
+
+        const result = await VideoService.searchVideos(
+            query,
+            sortBy,
+            viewed === 'true' ? true : viewed === 'false' ? false : null,
+            currentUserId,
+            parsedPage,
+            parsedLimit
+        );
+
+        res.status(200).json(result);
     } catch (error) {
-        return res.status(500).json({
-            status: 'ERROR',
-            message: error.message,
-        });
+        console.error('❌ Controller: Error in searchVideos:', error.message);
+        if (error.message === 'Thiếu tham số query.' ||
+            error.message === 'Giá trị sortBy không hợp lệ.' ||
+            error.message === 'Trang hoặc giới hạn không hợp lệ.' ||
+            error.message === 'ID người dùng không hợp lệ khi lọc video đã xem.') {
+            return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: 'Không thể tìm kiếm video.' });
     }
 };
 
 const incrementView = async (req, res) => {
-    const { videoid } = req.params;
-
     try {
-        await videoService.incrementView(videoid);
-        return res.status(200).json({ message: "Lượt xem đã được cập nhật." });
+        const videoid = req.params.videoid;
+
+        // Kiểm tra videoid
+        const parsedVideoid = parseInt(videoid);
+        if (isNaN(parsedVideoid) || parsedVideoid <= 0) {
+            return res.status(400).json({ error: 'ID video không hợp lệ.' });
+        }
+
+        await VideoService.incrementView(parsedVideoid);
+        res.status(200).json({ message: 'Lượt xem đã được cập nhật.' });
     } catch (error) {
-        console.error("Lỗi khi cập nhật lượt xem:", error);
-        return res.status(500).json({ message: "Không thể cập nhật lượt xem." });
+        console.error('❌ Controller: Error incrementing view:', error.message);
+        if (error.message === 'Invalid video ID') {
+            return res.status(400).json({ error: 'ID video không hợp lệ.' });
+        }
+        res.status(500).json({ error: 'Không thể cập nhật lượt xem.' });
     }
 };
 
-// Thêm phương thức lấy video theo type
 const getVideosByType = async (req, res) => {
-    const { videotype } = req.params;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
-    const excludeId = req.query.exclude ? parseInt(req.query.exclude) : null; // 🔥 Thêm dòng này
-
     try {
-        const videos = await videoService.getVideosByType(videotype, page, limit, excludeId); // ✅ Truyền excludeId
-        return res.status(200).json(videos);
+        const videotype = parseInt(req.params.videotype);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const excludeId = req.query.exclude ? parseInt(req.query.exclude) : null;
+
+        // Kiểm tra tham số
+        if (isNaN(videotype)) {
+            return res.status(400).json({ error: 'Loại video không hợp lệ.' });
+        }
+        if (isNaN(page) || page < 1 || isNaN(limit) || limit < 1) {
+            return res.status(400).json({ error: 'Trang hoặc giới hạn không hợp lệ.' });
+        }
+        if (excludeId !== null && (isNaN(excludeId) || excludeId <= 0)) {
+            return res.status(400).json({ error: 'ID loại trừ không hợp lệ.' });
+        }
+
+        const videos = await VideoService.getVideosByType(videotype, page, limit, excludeId);
+        res.status(200).json(videos);
     } catch (error) {
-        console.error('Error fetching videos by type:', error);
-        return res.status(500).json({ message: 'Có lỗi xảy ra' });
+        console.error('❌ Controller: Error fetching videos by type:', error.message);
+        res.status(500).json({ error: 'Không thể lấy video theo loại.' });
     }
 };
 
 const getVideosByUserId = async (req, res) => {
     try {
-        const userid = req.params.userid; // Lấy từ URL: /account/get-videos/:userid
+        const userid = parseInt(req.params.userid);
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
 
-        const videos = await videoService.getVideosByUserId(userid, page, limit);
+        // Kiểm tra userid
+        if (isNaN(userid) || userid <= 0) {
+            return res.status(400).json({ error: 'ID người dùng không hợp lệ.' });
+        }
+        if (isNaN(page) || page < 1 || isNaN(limit) || limit < 1) {
+            return res.status(400).json({ error: 'Trang hoặc giới hạn không hợp lệ.' });
+        }
 
-        res.json({
+        const videos = await VideoService.getVideosByUserId(userid, page, limit);
+        res.status(200).json({
             status: 'OK',
             message: 'Lấy video thành công',
             data: videos,
         });
     } catch (error) {
-        console.error('Error fetching videos by user ID:', error);
-        res.status(500).json({ error: error.message });
+        console.error('❌ Controller: Error fetching videos by user ID:', error.message);
+        res.status(500).json({ error: 'Không thể lấy video của người dùng.' });
     }
 };
-
 
 module.exports = {
     uploadVideo,
@@ -173,8 +295,8 @@ module.exports = {
     getVideoById,
     updateVideo,
     deleteVideo,
-    searchVideo,
+    searchVideos,
     incrementView,
-    getVideosByType, // Xuất phương thức mới
+    getVideosByType,
     getVideosByUserId
 };

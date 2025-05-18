@@ -148,21 +148,22 @@ const getAccountById = async (req, res) => {
     }
 }
 
-const searchAccountByName = async (req, res) => {
-    const { name } = req.query; // Lấy tên từ query string
-
+const searchAccounts = async (req, res) => {
     try {
-        const accounts = await AccountService.getAccountByName(name); // Gọi dịch vụ tìm kiếm
-        return res.status(200).json({
-            status: 'OK',
-            message: 'Tìm kiếm tài khoản thành công',
-            data: accounts,
-        });
+        const { query, page = 1, limit = 20 } = req.query;
+
+        console.log(`🚀 Controller: Search accounts with query=${query}, page=${page}, limit=${limit}`);
+
+        if (!query) {
+            return res.status(400).json({ error: 'Thiếu tham số query.' });
+        }
+
+        const result = await AccountService.searchAccounts(query, parseInt(page), parseInt(limit));
+
+        res.status(200).json(result);
     } catch (error) {
-        return res.status(500).json({
-            status: 'ERROR',
-            message: error.message,
-        });
+        console.error('❌ Controller: Error in searchAccounts:', error.message);
+        res.status(500).json({ error: 'Không thể tìm kiếm Kênh.' });
     }
 };
 
@@ -173,5 +174,5 @@ module.exports = {
     loginAccount,
     updateAccount,
     deleteAccount,
-    searchAccountByName
+    searchAccounts
 }

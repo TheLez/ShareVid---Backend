@@ -144,10 +144,24 @@ const deleteSubscription = async (userid, useridsub) => {
     };
 };
 
+const checkSubscribe = async (userid, useridsub) => {
+    try {
+        console.log(`🔍 Service: Checking subscription for user ${userid} to channel ${useridsub}`);
+        const subscription = await SubscribeModel.findOne({ userid, useridsub });
+        return {
+            isSubscribed: !!subscription // Trả về true nếu có bản ghi, false nếu không
+        };
+    } catch (error) {
+        console.error('❌ Service: Error checking subscription:', error);
+        throw new Error('Không thể kiểm tra trạng thái đăng ký.');
+    }
+};
+
 module.exports = {
     addSubscription,
     getAllSubscriptions,
     getSubscriptionByUserId,
     getTopSubscriptions,
     deleteSubscription,
+    checkSubscribe
 };

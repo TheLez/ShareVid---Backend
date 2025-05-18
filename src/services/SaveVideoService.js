@@ -27,8 +27,22 @@ const removeSavedVideo = async (userid, videoid) => {
     });
 };
 
+const checkSaved = async (userid, videoid) => {
+    try {
+        console.log(`🔍 Service: Checking saved status for user ${userid} and video ${videoid}`);
+        const savedVideo = await SavevideoModel.findOne({ userid, videoid });
+        return {
+            isSaved: !!savedVideo // Trả về true nếu có bản ghi, false nếu không
+        };
+    } catch (error) {
+        console.error('❌ Service: Error checking saved status:', error);
+        throw new Error('Không thể kiểm tra trạng thái lưu video.');
+    }
+};
+
 module.exports = {
     getAllSavedVideosByUser,
     addSavedVideo,
     removeSavedVideo,
+    checkSaved
 };

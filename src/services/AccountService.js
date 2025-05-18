@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const { generateAccessToken, generateRefreshToken } = require('./JwtService');
 const s3 = require('../config/awsConfig');
 const Sequelize = require('sequelize');
+const { Op } = require('sequelize');
 
 const createAccount = async (newAccount, file) => {
     const { name, password, email, role = 'user', gender, birth, subscription = 0, accountdescribe = '' } = newAccount;
@@ -212,18 +213,46 @@ const getAccountById = async (userid) => {
     }
 };
 
-const getAccountByName = async (name) => {
+const searchAccounts = async (query, page, limit) => {
     try {
-        const accounts = await AccountModel.findAll({
-            where: {
-                name: {
-                    [Sequelize.Op.like]: `%${name}%`, // Tìm kiếm với điều kiện LIKE
-                },
-            },
+        console.log(`🔍 Service: Searching accounts with query=${query}, page=${page}, limit=${limit}`);
+
+        // Kiểm tra tham số
+        if (!query) {
+            throw new Error('Thiếu tham số query.');
+        }
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+        if (isNaN(parsedPage) || parsedPage < 1 || isNaN(parsedLimit) || parsedLimit < 1) {
+            throw new Error('Trang hoặc giới hạn không hợp lệ.');
+        }
+
+        // Xây dựng điều kiện tìm kiếm
+        const searchConditions = {
+            name: { [Op.like]: `%${query}%` } // Tìm kiếm không phân biệt hoa thường
+        };
+
+        // Tính toán phân trang
+        const offset = (parsedPage - 1) * parsedLimit;
+
+        // Tìm kiếm kênh
+        const { count, rows } = await AccountModel.findAndCountAll({
+            where: searchConditions,
+            attributes: ['userid', 'name', 'avatar', 'subscription'],
+            offset,
+            limit: parsedLimit,
+            raw: true
         });
-        return accounts;
+
+        return {
+            data: rows,
+            total: count,
+            page: parsedPage,
+            totalPages: Math.ceil(count / parsedLimit)
+        };
     } catch (error) {
-        throw new Error('Lỗi khi tìm kiếm tài khoản: ' + error.message);
+        console.error('❌ Service: Error searching accounts:', error.message);
+        throw error;
     }
 };
 
@@ -234,5 +263,5 @@ module.exports = {
     loginAccount,
     updateAccount,
     deleteAccount,
-    getAccountByName
+    searchAccounts
 };

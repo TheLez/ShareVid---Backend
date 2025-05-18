@@ -13,4 +13,6 @@ router.post('/save', authMiddleware, saveVideoController.create);
 // Route xóa video đã lưu: cần xác thực
 router.delete('/remove/:videoid', authMiddleware, saveVideoController.remove);
 
+router.get('/saved/:videoid', authMiddleware, saveVideoController.check);
+
 module.exports = router;

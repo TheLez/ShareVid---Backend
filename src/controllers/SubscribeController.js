@@ -53,10 +53,26 @@ const deleteSubscription = async (req, res) => {
     }
 };
 
+const checkSubscribe = async (req, res) => {
+    try {
+        const { userid } = req.params; // Lấy useridsub từ params
+        const currentUserId = req.user.userid; // Lấy userid từ token (giả định middleware xác thực)
+
+        console.log(`🚀 Controller: Check subscribe for user ${currentUserId} to channel ${userid}`);
+        const result = await SubscribeService.checkSubscribe(currentUserId, userid);
+
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('❌ Controller: Error in checkSubscribe:', error.message);
+        res.status(500).json({ error: 'Không thể kiểm tra trạng thái đăng ký.' });
+    }
+};
+
 module.exports = {
     addSubscription,
     getAllSubscriptions,
     getSubscriptionByUserId,
     getTopSubscriptions,
     deleteSubscription,
+    checkSubscribe
 };
