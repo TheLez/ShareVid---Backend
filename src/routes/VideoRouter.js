@@ -28,4 +28,8 @@ router.get('/search', videoController.searchVideo);
 
 router.post('/:videoid/increment-view', authMiddleware, videoController.incrementView);
 
+router.get('/type/:videotype', authMiddleware, videoController.getVideosByType);
+
+router.get('/account/:userid', authMiddleware, videoController.getVideosByUserId)
+
 module.exports = router;

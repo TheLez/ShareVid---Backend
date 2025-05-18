@@ -1,10 +1,10 @@
 const SubscribeModel = require('../models/SubscribeModel');
 const VideoModel = require('../models/VideoModel');
 const AccountModel = require('../models/AccountModel');
-const { Sequelize } = require('sequelize');
+const { Sequelize, Op } = require('sequelize');
 
+// Thêm subscription
 const addSubscription = async (userid, useridsub) => {
-    // Kiểm tra xem subscription đã tồn tại chưa
     const existingSubscription = await SubscribeModel.findOne({
         where: { userid, useridsub }
     });
@@ -13,7 +13,6 @@ const addSubscription = async (userid, useridsub) => {
         throw new Error('Subscription already exists');
     }
 
-    // Tạo bản ghi mới
     const newSubscription = await SubscribeModel.create({
         userid,
         useridsub,
@@ -22,23 +21,29 @@ const addSubscription = async (userid, useridsub) => {
     return newSubscription;
 };
 
+// Lấy tất cả subscriptions của người dùng
 const getAllSubscriptions = async (userid) => {
     try {
         const subscriptions = await SubscribeModel.findAll({
-            where: { userid: userid },
+            where: { userid },
             include: [{
                 model: AccountModel,
-                attributes: ['userid', 'name', 'avatar'], // Chỉ lấy các thuộc tính cần thiết
+                as: 'SubscribedAccount',
+                attributes: ['userid', 'name', 'avatar'],
             }],
-            raw: true, // Thêm raw nếu bạn không cần đối tượng model
         });
 
-        // Tính toán số lượng người đăng ký cho mỗi tài khoản
         const subscriptionsWithCounts = await Promise.all(subscriptions.map(async (subscription) => {
             const subscriberCount = await SubscribeModel.count({
-                where: { useridsub: subscription.userid }, // Thay đổi để sử dụng userid từ subscription
+                where: { useridsub: subscription.useridsub },
             });
-            return { ...subscription, subscriberCount }; // Trả về thông tin tài khoản và số người đăng ký
+
+            return {
+                userid: subscription.SubscribedAccount.userid,
+                name: subscription.SubscribedAccount.name,
+                avatar: subscription.SubscribedAccount.avatar,
+                subscriberCount,
+            };
         }));
 
         return {
@@ -55,27 +60,55 @@ const getAllSubscriptions = async (userid) => {
     }
 };
 
+// Lấy tất cả video từ những người mà user đã subscribe
 const getSubscriptionByUserId = async (userid) => {
-    return await SubscribeModel.findAll({
-        where: { userid: userid },
-        include: [
-            {
-                model: VideoModel, // Kết hợp với model Video
-                required: true,
-                where: { userid: Sequelize.col('Subscribe.useridsub') }, // Lọc video theo useridsub
-            },
-        ],
-    });
+    try {
+        return await SubscribeModel.findAll({
+            where: { userid },
+            include: [
+                {
+                    model: VideoModel,
+                    required: true,
+                    where: {
+                        userid: Sequelize.col('Subscribe.useridsub'),
+                    },
+                },
+            ],
+        });
+    } catch (error) {
+        console.error('Error fetching subscription videos:', error);
+        throw error;
+    }
 };
 
+// ✅ Lấy top 3 người mà user đã đăng ký có nhiều subscriber nhất
 const getTopSubscriptions = async (userid) => {
     try {
+        // Lấy tất cả useridsub mà người dùng đã đăng ký
+        const subscriptions = await SubscribeModel.findAll({
+            where: { userid },
+            attributes: ['useridsub'],
+            raw: true,
+        });
+
+        const subscribedIds = subscriptions.map(sub => sub.useridsub);
+
+        if (subscribedIds.length === 0) {
+            return {
+                status: 'OK',
+                message: 'Người dùng chưa đăng ký ai.',
+                data: [],
+            };
+        }
+
         const topSubscriptions = await AccountModel.findAll({
-            where: { userid: userid }, // Chỉ lấy tài khoản đang đăng nhập
-            attributes: ['userid', 'name', 'subscription'], // Lấy userid, name và subscription
-            order: [['subscription', 'DESC']], // Sắp xếp theo subscription cao nhất
+            where: {
+                userid: { [Op.in]: subscribedIds },
+            },
+            attributes: ['userid', 'name', 'subscription', 'avatar'],
+            order: [['subscription', 'DESC']],
             limit: 3,
-            raw: true, // Cần raw: true để Sequelize không trả về các đối tượng model
+            raw: true,
         });
 
         return {
@@ -92,12 +125,10 @@ const getTopSubscriptions = async (userid) => {
     }
 };
 
+// Xoá subscription
 const deleteSubscription = async (userid, useridsub) => {
     const deletedCount = await SubscribeModel.destroy({
-        where: {
-            userid: userid,
-            useridsub: useridsub,
-        },
+        where: { userid, useridsub },
     });
 
     if (deletedCount === 0) {

@@ -10,4 +10,6 @@ router.post('/like-comment', authMiddleware, likeCommentController.create);
 // Route xóa like bình luận: cần xác thực
 router.delete('/unlike-comment/:commentid', authMiddleware, likeCommentController.remove);
 
+router.get('/like-comment/:commentid', authMiddleware, likeCommentController.check);
+
 module.exports = router;

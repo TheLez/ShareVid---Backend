@@ -1,6 +1,7 @@
 const {
     addLikeComment,
     removeLikeComment,
+    checkUserCommentLike,
 } = require('../services/LikeCommentService');
 
 const create = async (req, res) => {
@@ -34,7 +35,24 @@ const remove = async (req, res) => {
     }
 };
 
+// Kiểm tra trạng thái like của bình luận
+const check = async (req, res) => {
+    const { commentid } = req.params; // Lấy commentid từ params
+    const userid = req.user.userid; // Lấy userid từ thông tin người dùng đã xác thực
+
+    try {
+        const likeStatus = await checkUserCommentLike(userid, commentid);
+        return res.status(200).json({
+            status: 'OK',
+            type: likeStatus, // 1: like, 0: dislike, null: chưa like
+        });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     create,
     remove,
+    check, // Xuất hàm kiểm tra trạng thái like
 };

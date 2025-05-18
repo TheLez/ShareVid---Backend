@@ -190,11 +190,6 @@ const getAccountById = async (userid) => {
     try {
         const account = await AccountModel.findOne({
             where: { userid: userid },
-            include: [{
-                model: VideoModel,
-                where: { userid: userid },
-                required: false,
-            }]
         });
 
         if (!account) {
@@ -204,21 +199,11 @@ const getAccountById = async (userid) => {
             };
         }
 
-        const subscriberCount = await SubscribeModel.count({
-            where: { useridsub: userid }
-        });
-
-        const videoCount = await VideoModel.count({
-            where: { userid: userid }
-        });
-
         return {
             status: 'OK',
             message: 'Lấy thông tin tài khoản thành công',
             data: {
-                account,
-                subscriberCount,
-                videoCount,
+                account
             }
         };
     } catch (error) {

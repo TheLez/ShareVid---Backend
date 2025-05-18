@@ -13,6 +13,7 @@ const s3 = require('../config/awsConfig');
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
+const { Op } = require('sequelize');
 
 const uploadVideo = async (videoFile, thumbnailFile = null, videoData) => {
     if (!videoFile) {
@@ -94,13 +95,13 @@ const uploadVideo = async (videoFile, thumbnailFile = null, videoData) => {
             title: videoData.title,
             video: `https://${process.env.S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${videoKey}`,
             thumbnail: thumbnailUrl,
-            created_at: new Date(),
+            created_at: videoData.created_at || new Date(),
             videotype: videoData.videotype || 0,
             videoview: videoData.videoview || 0,
             videolike: videoData.videolike || 0,
             videodislike: videoData.videodislike || 0,
             videodescribe: videoData.videodescribe || '',
-            status: videoData.status,
+            status: videoData.status || 1,
             userid: videoData.userid || null,
         });
 
@@ -112,20 +113,38 @@ const uploadVideo = async (videoFile, thumbnailFile = null, videoData) => {
 };
 
 // Các phương thức còn lại không thay đổi
-const getAllVideos = async () => {
+const getAllVideos = async (videotype = null, page = 1, limit = 50, excludeId = null, orderByView = false) => {
     try {
-        const videos = await VideoModel.findAll({
-            where: { status: 1 }, // Chỉ lấy video có status = 1
+        const offset = (page - 1) * limit;
+
+        const whereCondition = {
+            status: 1, // Chỉ lấy video đang hoạt động
+            ...(videotype !== null && { videotype }), // Nếu có videotype, thêm vào điều kiện
+            ...(excludeId && { videoid: { [Op.ne]: excludeId } }) // Loại trừ video hiện tại nếu có
+        };
+
+        const orderCondition = orderByView
+            ? [['videoview', 'DESC'], ['created_at', 'DESC'], ['videoid', 'DESC']] // Sắp xếp theo lượt xem trước, sau đó theo ngày tạo
+            : [['created_at', 'DESC'], ['videoid', 'DESC']]; // Mặc định sắp xếp theo ngày tạo mới nhất
+
+        const { count, rows } = await VideoModel.findAndCountAll({
+            where: whereCondition,
             include: [{
                 model: AccountModel,
-                attributes: ['userid', 'name', 'avatar'], // Chọn các thuộc tính của người dùng cần lấy
+                attributes: ['userid', 'name', 'avatar'],
             }],
+            order: orderCondition,
+            limit,
+            offset,
         });
 
         return {
             status: 'OK',
             message: 'Lấy tất cả video thành công',
-            data: videos,
+            data: rows,
+            total: count,
+            page,
+            totalPages: Math.ceil(count / limit),
         };
     } catch (error) {
         console.error('Error fetching all videos:', error);
@@ -160,16 +179,7 @@ const getVideoById = async (videoid, userid) => {
         include: [
             {
                 model: AccountModel,
-                attributes: ['name', 'email', 'avatar', 'subscription'], // Thêm subscription
-            },
-            {
-                model: CommentModel,
-                include: [
-                    {
-                        model: AccountModel,
-                        attributes: ['userid', 'name', 'email', 'avatar'],
-                    },
-                ],
+                attributes: ['userid', 'name', 'email', 'avatar', 'subscription'], // Thêm subscription
             },
             {
                 model: LikevideoModel,
@@ -199,17 +209,29 @@ const deleteVideo = async (videoid) => {
     throw new Error('Video not found');
 };
 
-const searchVideoByTitle = async (title) => {
+const searchVideoByTitle = async (title, page = 1, limit = 50) => {
     try {
-        const videos = await VideoModel.findAll({
+        const offset = (page - 1) * limit; // Tính toán offset
+
+        const { count, rows } = await VideoModel.findAndCountAll({
             where: {
                 title: {
                     [Op.like]: `%${title}%`, // Sử dụng LIKE để tìm kiếm
                 },
                 status: 1, // Chỉ lấy video có status = 1
             },
+            limit: limit,
+            offset: offset,
         });
-        return videos;
+
+        return {
+            status: 'OK',
+            message: 'Tìm kiếm video thành công',
+            data: rows,
+            total: count, // Tổng số video
+            page: page,
+            totalPages: Math.ceil(count / limit), // Tổng số trang
+        };
     } catch (error) {
         throw new Error('Lỗi khi tìm kiếm video: ' + error.message);
     }
@@ -226,6 +248,72 @@ const incrementView = async (videoid) => {
     }
 };
 
+const getVideosByType = async (videotype, page = 1, limit = 50, excludeId = null) => {
+    try {
+        const offset = (page - 1) * limit;
+
+        const whereCondition = {
+            videotype,
+            status: 1,
+            ...(excludeId && { videoid: { [Op.ne]: excludeId } }) // Loại trừ video hiện tại nếu có
+        };
+
+        const { count, rows } = await VideoModel.findAndCountAll({
+            where: whereCondition,
+            include: [{
+                model: AccountModel,
+                attributes: ['userid', 'name', 'avatar'],
+            }],
+            order: [
+                ['videoview', 'DESC'],
+                ['created_at', 'DESC']
+            ], // Sắp xếp mới nhất trước
+            limit,
+            offset,
+        });
+
+        return {
+            status: 'OK',
+            message: 'Lấy video theo type thành công',
+            data: rows,
+            total: count,
+            page,
+            totalPages: Math.ceil(count / limit),
+        };
+    } catch (error) {
+        console.error('Error fetching videos by type:', error);
+        return {
+            status: 'ERROR',
+            message: 'Lấy video theo type thất bại',
+        };
+    }
+};
+
+const getVideosByUserId = async (userid, page = 1, limit = 20) => {
+    const offset = (page - 1) * limit;
+
+    const videos = await VideoModel.findAll({
+        where: { userid, status: 1 },
+        order: [['created_at', 'DESC']],
+        limit,
+        offset,
+        include: [
+            {
+                model: AccountModel,
+                attributes: ['name', 'email', 'avatar', 'subscription'],
+            },
+            {
+                model: LikevideoModel,
+                attributes: [],
+                required: false,
+            },
+        ],
+    });
+
+    return videos;
+};
+
+
 module.exports = {
     uploadVideo,
     getAllVideos,
@@ -233,5 +321,7 @@ module.exports = {
     updateVideo,
     deleteVideo,
     searchVideoByTitle,
-    incrementView
+    incrementView,
+    getVideosByType,
+    getVideosByUserId
 };

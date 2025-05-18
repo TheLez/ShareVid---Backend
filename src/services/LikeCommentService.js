@@ -10,7 +10,13 @@ const removeLikeComment = async (userid, commentid) => {
     });
 };
 
+const checkUserCommentLike = async (userid, commentid) => {
+    const like = await LikecommentModel.findOne({ where: { userid, commentid } });
+    return like ? like.type : null; // Trả về type hoặc null nếu chưa like
+};
+
 module.exports = {
     addLikeComment,
     removeLikeComment,
+    checkUserCommentLike
 };

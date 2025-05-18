@@ -5,20 +5,27 @@ const getAllComments = async () => {
     return await CommentModel.findAll({
         include: [{
             model: AccountModel,
-            attributes: ['name', 'avatar'] // Chọn các thuộc tính cần thiết của tài khoản
+            attributes: ['userid', 'name', 'avatar'] // Chọn các thuộc tính cần thiết của tài khoản
         }]
     });
 };
 
-const getCommentsByVideoId = async (videoid) => {
+const getCommentsByVideoId = async (videoid, limit, offset) => {
     return await CommentModel.findAll({
         where: { videoid },
         include: [{
             model: AccountModel,
-            attributes: ['name', 'avatar'] // Chọn các thuộc tính cần thiết của tài khoản
-        }]
+            attributes: ['userid', 'name', 'avatar'],
+        }],
+        order: [
+            ['created_at', 'DESC'],
+            ['commentid', 'DESC']
+        ], // Sắp xếp mới nhất
+        limit,
+        offset,
     });
 };
+
 
 const addComment = async (content, userid, videoid) => {
     return await CommentModel.create({ content, userid, videoid, status: 1 });

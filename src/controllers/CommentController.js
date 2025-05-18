@@ -20,9 +20,16 @@ const getAll = async (req, res) => {
 };
 
 const getByVideoId = async (req, res) => {
-    const { videoid } = req.params; // Lấy videoid từ params
+    const { videoid } = req.params;
+    const { page = 1, limit = 5 } = req.query;
+
     try {
-        const comments = await getCommentsByVideoId(videoid);
+        const pageNumber = parseInt(page, 10);
+        const limitNumber = parseInt(limit, 10);
+        const offset = (pageNumber - 1) * limitNumber;
+
+        const comments = await getCommentsByVideoId(videoid, limitNumber, offset);
+
         return res.status(200).json({
             status: 'OK',
             message: 'Lấy bình luận theo video thành công',
@@ -32,6 +39,7 @@ const getByVideoId = async (req, res) => {
         return res.status(500).json({ message: error.message });
     }
 };
+
 
 const create = async (req, res) => {
     const { content } = req.body; // Lấy nội dung từ body
