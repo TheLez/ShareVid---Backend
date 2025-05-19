@@ -14,8 +14,10 @@ const addSubscription = async (req, res) => {
 
 const getAllSubscriptions = async (req, res) => {
     const userid = req.user.userid; // Lấy userid từ thông tin người dùng đã xác thực
+    const { page = 1, limit = 20 } = req.query; // Lấy page và limit từ query params
+
     try {
-        const subscriptions = await SubscribeService.getAllSubscriptions(userid);
+        const subscriptions = await SubscribeService.getAllSubscriptions(userid, parseInt(page), parseInt(limit));
         return res.status(200).json(subscriptions);
     } catch (error) {
         return res.status(500).json({ message: error.message });

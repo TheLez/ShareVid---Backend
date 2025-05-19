@@ -7,15 +7,25 @@ const {
 
 const getAll = async (req, res) => {
     const userid = req.user.userid; // Lấy userid từ thông tin người dùng đã xác thực
+    const page = parseInt(req.query.page) || 1; // Mặc định page = 1
+    const limit = parseInt(req.query.limit) || 20; // Mặc định limit = 20
+    const offset = (page - 1) * limit; // Tính offset
 
     try {
-        const savedVideos = await getAllSavedVideosByUser(userid);
+        console.log(`🚀 Controller: Get saved videos for userid=${userid}, page=${page}, limit=${limit}`);
+        const { rows, count } = await getAllSavedVideosByUser(userid, limit, offset);
+        const totalPages = Math.ceil(count / limit);
+
         return res.status(200).json({
             status: 'OK',
             message: 'Lấy tất cả video đã lưu thành công',
-            data: savedVideos,
+            data: rows,
+            total: count,
+            page,
+            totalPages,
         });
     } catch (error) {
+        console.error('Error in getAll:', error);
         return res.status(500).json({ message: error.message });
     }
 };

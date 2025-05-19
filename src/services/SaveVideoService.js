@@ -3,18 +3,39 @@ const VideoModel = require('../models/VideoModel'); // Đường dẫn tới mod
 const AccountModel = require('../models/AccountModel'); // Đường dẫn tới model Account
 const { Op } = require('sequelize');
 
-const getAllSavedVideosByUser = async (userid) => {
-    return await SavevideoModel.findAll({
+const getAllSavedVideosByUser = async (userid, limit, offset) => {
+    const { count, rows } = await SavevideoModel.findAndCountAll({
         where: { userid },
         include: [{
             model: VideoModel,
-            attributes: ['videoid', 'title', 'description'], // Các thuộc tính cần lấy
+            required: true,
+            attributes: [
+                'videoid',
+                'title',
+                'thumbnail',
+                'videoview',
+                'created_at',
+                'videotype',
+                'videolike',
+                'videodislike',
+                'videodescribe',
+                'status',
+                'userid'
+            ],
+            where: { status: 1 }, // Chỉ lấy video công khai
             include: [{
                 model: AccountModel,
-                attributes: ['userid', 'name'], // Lấy thông tin người đăng video
+                attributes: ['userid', 'name'],
             }],
         }],
+        limit,
+        offset,
+        raw: true,
+        nest: true,
     });
+
+    console.log(`🔍 Service: Found ${rows.length} saved videos, total: ${count}, video IDs: ${rows.map(v => v.videoid).join(',')}`);
+    return { rows, count };
 };
 
 const addSavedVideo = async (userid, videoid) => {

@@ -1,13 +1,36 @@
 const LikeVideoService = require('../services/LikeVideoService');
 
 const getLikedVideos = async (req, res) => {
-    const userid = req.user.userid; // Lấy userid từ thông tin người dùng đã xác thực
-
     try {
-        const likedVideos = await LikeVideoService.getLikedVideos(userid);
-        return res.status(200).json(likedVideos);
+        const userid = req.user?.userid;
+        const { page = 1, limit = 20 } = req.query;
+
+        console.log(`🚀 Controller: Get liked videos for userid=${userid}, page=${page}, limit=${limit}`);
+
+        // Kiểm tra userid
+        if (!userid || isNaN(parseInt(userid)) || parseInt(userid) <= 0) {
+            return res.status(400).json({ error: 'ID người dùng không hợp lệ.' });
+        }
+
+        // Kiểm tra page và limit
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+        if (isNaN(parsedPage) || parsedPage < 1 || isNaN(parsedLimit) || parsedLimit < 1) {
+            return res.status(400).json({ error: 'Trang hoặc giới hạn không hợp lệ.' });
+        }
+
+        const result = await LikeVideoService.getLikedVideos(userid, parsedPage, parsedLimit);
+
+        console.log(`🚀 Controller: Returned ${result.data.length} liked videos, total: ${result.total}`);
+
+        res.status(200).json(result);
     } catch (error) {
-        return res.status(500).json({ message: error.message });
+        console.error('❌ Controller: Error in getLikedVideos:', error.message);
+        if (error.message === 'ID người dùng không hợp lệ.' ||
+            error.message === 'Trang hoặc giới hạn không hợp lệ.') {
+            return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: 'Không thể lấy danh sách video đã thích.' });
     }
 };
 

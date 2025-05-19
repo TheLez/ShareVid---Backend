@@ -2,17 +2,26 @@ const { getWatchedRecordsByUser, createWatchedRecord, removeWatchedRecord } = re
 
 const getAllWatched = async (req, res) => {
     const userid = req.user.userid; // Lấy userid từ thông tin người dùng đã xác thực
+    const page = parseInt(req.query.page) || 1; // Mặc định page = 1
+    const limit = parseInt(req.query.limit) || 20; // Mặc định limit = 20
+    const offset = (page - 1) * limit; // Tính offset
 
     try {
-        const records = await getWatchedRecordsByUser(userid);
-        res.status(200).json({
+        console.log(`🚀 Controller: Get watched records for userid=${userid}, page=${page}, limit=${limit}`);
+        const { rows, count } = await getWatchedRecordsByUser(userid, limit, offset);
+        const totalPages = Math.ceil(count / limit);
+
+        return res.status(200).json({
             status: 'OK',
             message: 'Lấy tất cả bản ghi của người dùng thành công',
-            data: records,
+            data: rows,
+            total: count,
+            page,
+            totalPages,
         });
     } catch (error) {
         console.error('Error getting watched records:', error);
-        res.status(500).json({
+        return res.status(500).json({
             status: 'ERROR',
             message: 'Lấy bản ghi thất bại',
         });

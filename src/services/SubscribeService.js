@@ -22,41 +22,50 @@ const addSubscription = async (userid, useridsub) => {
 };
 
 // Lấy tất cả subscriptions của người dùng
-const getAllSubscriptions = async (userid) => {
+const getAllSubscriptions = async (userid, page, limit) => {
     try {
-        const subscriptions = await SubscribeModel.findAll({
+        // Kiểm tra tham số
+        if (!userid || isNaN(parseInt(userid)) || parseInt(userid) <= 0) {
+            throw new Error('ID người dùng không hợp lệ.');
+        }
+        if (isNaN(page) || page < 1 || isNaN(limit) || limit < 1) {
+            throw new Error('Trang hoặc giới hạn không hợp lệ.');
+        }
+
+        const offset = (page - 1) * limit;
+
+        // Tìm kiếm subscriptions với phân trang
+        const { count, rows } = await SubscribeModel.findAndCountAll({
             where: { userid },
             include: [{
                 model: AccountModel,
-                as: 'SubscribedAccount',
-                attributes: ['userid', 'name', 'avatar'],
+                attributes: ['userid', 'name', 'avatar', 'subscription'],
             }],
+            offset,
+            limit,
+            raw: true,
+            nest: true,
         });
 
-        const subscriptionsWithCounts = await Promise.all(subscriptions.map(async (subscription) => {
-            const subscriberCount = await SubscribeModel.count({
-                where: { useridsub: subscription.useridsub },
-            });
-
-            return {
-                userid: subscription.SubscribedAccount.userid,
-                name: subscription.SubscribedAccount.name,
-                avatar: subscription.SubscribedAccount.avatar,
-                subscriberCount,
-            };
+        // Map dữ liệu thành định dạng response
+        const subscriptions = rows.map(subscription => ({
+            userid: subscription.Account.userid,
+            name: subscription.Account.name,
+            avatar: subscription.Account.avatar,
+            subscriberCount: subscription.Account.subscription,
         }));
 
         return {
             status: 'OK',
             message: 'Lấy thông tin đăng ký thành công',
-            data: subscriptionsWithCounts,
+            data: subscriptions,
+            total: count,
+            page,
+            totalPages: Math.ceil(count / limit),
         };
     } catch (error) {
         console.error('Error fetching subscriptions:', error);
-        return {
-            status: 'ERROR',
-            message: 'Lấy thông tin đăng ký thất bại',
-        };
+        throw new Error(error.message || 'Lấy thông tin đăng ký thất bại');
     }
 };
 
