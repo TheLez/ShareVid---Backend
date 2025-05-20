@@ -7,6 +7,7 @@ const {
     LikevideoModel,
     SubscribeModel,
     WatchedModel,
+    NotificationModel
 } = require('../models');
 
 const s3 = require('../config/awsConfig');
@@ -26,6 +27,9 @@ const uploadVideo = async (videoFile, thumbnailFile = null, videoData) => {
     }
     if (videoData.status === undefined) {
         throw new Error('Status is required');
+    }
+    if (!videoData.userid) {
+        throw new Error('User ID is required');
     }
 
     const videoKey = `videos/${videoFile.originalname}`;
@@ -102,13 +106,51 @@ const uploadVideo = async (videoFile, thumbnailFile = null, videoData) => {
             videodislike: videoData.videodislike || 0,
             videodescribe: videoData.videodescribe || '',
             status: videoData.status || 1,
-            userid: videoData.userid || null,
+            userid: videoData.userid
         });
+
+        // Tạo thông báo cho subscriber
+        try {
+            // Lấy tên tài khoản
+            const account = await AccountModel.findByPk(videoData.userid, {
+                attributes: ['name']
+            });
+            if (!account) {
+                console.error('Account not found for userid:', videoData.userid);
+                throw new Error('Account not found');
+            }
+
+            // Lấy danh sách subscriber
+            const subscribers = await SubscribeModel.findAll({
+                where: { useridsub: videoData.userid },
+                attributes: ['userid']
+            });
+
+            console.log('Subscribers found:', subscribers.map(s => s.userid));
+
+            // Tạo thông báo
+            const notifications = subscribers.map(sub => ({
+                content: `${account.name} đã đăng video mới ${videoData.title}`,
+                created_at: new Date(),
+                status: 0,
+                userid: sub.userid
+            }));
+
+            if (notifications.length > 0) {
+                await NotificationModel.bulkCreate(notifications);
+                console.log('Notifications created:', notifications.length);
+            } else {
+                console.log('No subscribers to notify');
+            }
+        } catch (notificationError) {
+            console.error('Error creating notifications:', notificationError);
+            // Không throw lỗi để không làm gián đoạn việc upload video
+        }
 
         return video;
     } catch (error) {
         console.error('Error uploading video:', error);
-        throw new Error('Failed to upload video');
+        throw new Error(`Failed to upload video: ${error.message}`);
     }
 };
 
