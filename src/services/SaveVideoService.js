@@ -50,14 +50,38 @@ const removeSavedVideo = async (userid, videoid) => {
 
 const checkSaved = async (userid, videoid) => {
     try {
-        console.log(`🔍 Service: Checking saved status for user ${userid} and video ${videoid}`);
-        const savedVideo = await SavevideoModel.findOne({ userid, videoid });
+        // Kiểm tra tham số đầu vào
+        if (!userid || !videoid) {
+            console.warn(`⚠️ Service: Missing userid or videoid`, { userid, videoid });
+            return { isSaved: false };
+        }
+
+        // Chuẩn hóa kiểu dữ liệu
+        const queryUserId = userid;
+        const queryVideoId = videoid;
+
+        console.log(`🔍 Service: Checking saved status for user ${queryUserId} and video ${queryVideoId}`);
+
+        // Tìm bản ghi với Sequelize
+        const savedVideo = await SavevideoModel.findOne({
+            where: {
+                userid: queryUserId,
+                videoid: queryVideoId,
+            }
+        });
+
+        console.log(`🔍 Service: Found saved video:`, savedVideo ? savedVideo.toJSON() : null);
+
         return {
-            isSaved: !!savedVideo // Trả về true nếu có bản ghi, false nếu không
+            isSaved: !!savedVideo // true nếu tìm thấy, false nếu không
         };
     } catch (error) {
-        console.error('❌ Service: Error checking saved status:', error);
-        throw new Error('Không thể kiểm tra trạng thái lưu video.');
+        console.error('❌ Service: Error checking saved status:', {
+            error: error.message,
+            userid,
+            videoid,
+        });
+        return { isSaved: false };
     }
 };
 

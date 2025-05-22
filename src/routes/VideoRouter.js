@@ -19,10 +19,10 @@ router.get('/get-all', videoController.getAllVideos);
 router.get('/:videoid', authMiddleware, videoController.getVideoById);
 
 // Route cập nhật video: cần xác thực
-router.put('update/:videoid', authMiddleware, videoController.updateVideo);
+router.put('/update/:videoid', authMiddleware, videoController.updateVideo);
 
 // Route xóa video: cần xác thực
-router.delete('delete/:videoid', authMiddleware, videoController.deleteVideo);
+router.delete('/delete/:videoid', authMiddleware, videoController.deleteVideo);
 
 router.get('/get/search', authMiddleware, videoController.searchVideos);
 
@@ -30,6 +30,8 @@ router.post('/:videoid/increment-view', authMiddleware, videoController.incremen
 
 router.get('/type/:videotype', authMiddleware, videoController.getVideosByType);
 
-router.get('/account/:userid', authMiddleware, videoController.getVideosByUserId)
+router.get('/account/:userid', authMiddleware, videoController.getVideosByUserId);
+
+router.get('/my-profile/:userid', authMiddleware, videoController.getMyVideos)
 
 module.exports = router;

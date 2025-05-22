@@ -2,7 +2,7 @@ const NotificationModel = require('../models/NotificationModel'); // Đường d
 const AccountModel = require('../models/AccountModel');
 
 const createNotification = async (userid, content) => {
-    return await NotificationModel.create({ userid, content, status: 1 });
+    return await NotificationModel.create({ userid, content, status: 0 });
 };
 
 const countUnreadNotifications = async (userid) => {

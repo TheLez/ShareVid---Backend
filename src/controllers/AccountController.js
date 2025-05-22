@@ -75,25 +75,46 @@ const loginAccount = async (req, res) => {
 
 const updateAccount = async (req, res) => {
     try {
-        const userid = req.params.id;
-        const updateData = req.body; // Lấy dữ liệu cần cập nhật từ req.body
+        const { id } = req.params;
+        const file = req.file;
+        console.log('Controller: Updating account by id:', id);
+        console.log('Request body:', req.body);
+        console.log('Request file:', file);
 
-        // Kiểm tra thông tin đầu vào
-        if (!userid || !updateData) {
-            return res.status(400).json({
-                status: 'ERR',
-                message: 'Cần điền đủ thông tin'
-            });
+        if (!req.body) {
+            throw new Error('Request body is undefined');
         }
 
-        const response = await AccountService.updateAccount(userid, updateData);
-        return res.status(200).json(response);
-    } catch (e) {
-        return res.status(500).json({
-            message: e.message || 'Đã xảy ra lỗi'
-        });
+        const { name, gender, birth, email, role, status, accountdescribe } = req.body;
+
+        // Validate các trường bắt buộc
+        if (!name || !email || !role || status === undefined) {
+            return res.status(400).json({ error: 'Thiếu các trường bắt buộc: name, email, role, status.' });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Email không hợp lệ.' });
+        }
+
+        const updateData = {
+            name,
+            gender: gender ? parseInt(gender) : null,
+            birth: birth || null,
+            email,
+            role,
+            status: parseInt(status),
+            accountdescribe: accountdescribe || ''
+        };
+
+        const result = await AccountService.updateAccountById(id, updateData, file);
+
+        res.status(200).json(result);
+    } catch (err) {
+        console.error('Controller: Error updating account by id:', err);
+        res.status(500).json({ error: err.message });
     }
-}
+};
 
 const deleteAccount = async (req, res) => {
     try {
@@ -118,14 +139,23 @@ const deleteAccount = async (req, res) => {
 
 const getAllAccount = async (req, res) => {
     try {
-        const response = await AccountService.getAllAccount();
-        return res.status(200).json(response);
+        const { page = 1, limit = 10, search = '' } = req.query;
+        console.log('Controller: Fetching all accounts with params:', { page, limit, search });
+
+        const response = await AccountService.getAllAccount({
+            page: parseInt(page, 10),
+            limit: parseInt(limit, 10),
+            search
+        });
+
+        res.status(200).json(response);
     } catch (e) {
-        return res.status(500).json({
+        console.error('Controller: Error fetching all accounts:', e);
+        res.status(500).json({
             message: e.message || 'Đã xảy ra lỗi'
         });
     }
-}
+};
 
 const getAccountById = async (req, res) => {
     try {
@@ -167,6 +197,34 @@ const searchAccounts = async (req, res) => {
     }
 };
 
+const updateAccountHandler = async (req, res) => {
+    try {
+        const userid = req.user.userid; // Từ token
+        const file = req.file; // Từ multer
+        console.log('Controller: Updating account for userid:', userid);
+        console.log('Request body:', req.body);
+        console.log('Request file:', file);
+
+        // Kiểm tra req.body
+        if (!req.body) {
+            throw new Error('Request body is undefined');
+        }
+
+        // Lấy dữ liệu từ req.body, cung cấp giá trị mặc định
+        const { name = '', accountdescribe = '' } = req.body;
+
+        const account = await AccountService.updateAccount(userid, { name, accountdescribe }, file);
+
+        res.status(200).json({
+            message: 'Account updated successfully',
+            data: { account }
+        });
+    } catch (err) {
+        console.error('Controller: Error updating account:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
 module.exports = {
     getAllAccount,
     getAccountById,
@@ -174,5 +232,6 @@ module.exports = {
     loginAccount,
     updateAccount,
     deleteAccount,
-    searchAccounts
+    searchAccounts,
+    updateAccountHandler
 }

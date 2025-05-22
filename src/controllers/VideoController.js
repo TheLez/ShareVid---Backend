@@ -39,12 +39,23 @@ const uploadVideo = async (req, res) => {
 };
 
 const getAllVideos = async (req, res) => {
+    console.log('getAllVideos called with:', { req: !!req, res: !!res }); // Debug
+
+    // Kiểm tra req và res
+    if (!req || !req.query || !res || typeof res.status !== 'function') {
+        console.error('❌ Controller: Invalid req or res object:', { req, res });
+        return res && typeof res.status === 'function'
+            ? res.status(500).json({ error: 'Lỗi server: Yêu cầu không hợp lệ.' })
+            : { status: 'ERROR', message: 'Yêu cầu không hợp lệ.' };
+    }
+
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 50;
         const videotype = req.query.type ? parseInt(req.query.type) : null;
         const excludeId = req.query.exclude ? parseInt(req.query.exclude) : null;
         const orderByView = req.query.orderByView === 'true';
+        const search = req.query.search ? req.query.search.trim() : null;
 
         // Kiểm tra tham số
         if (isNaN(page) || page < 1 || isNaN(limit) || limit < 1) {
@@ -56,12 +67,16 @@ const getAllVideos = async (req, res) => {
         if (excludeId !== null && (isNaN(excludeId) || excludeId <= 0)) {
             return res.status(400).json({ error: 'ID loại trừ không hợp lệ.' });
         }
+        if (search && typeof search !== 'string') {
+            return res.status(400).json({ error: 'Từ khóa tìm kiếm không hợp lệ.' });
+        }
 
-        const videos = await VideoService.getAllVideos(videotype, page, limit, excludeId, orderByView);
+        console.log('getAllVideos params:', { page, limit, videotype, excludeId, orderByView, search }); // Debug
+        const videos = await VideoService.getAllVideos(videotype, page, limit, excludeId, orderByView, search);
         res.status(200).json(videos);
     } catch (error) {
-        console.error('❌ Controller: Error fetching videos:', error.message);
-        res.status(500).json({ error: 'Không thể lấy danh sách video.' });
+        console.error('❌ Controller: Error fetching videos:', error.message, error.stack);
+        res.status(500).json({ error: `Không thể lấy danh sách video: ${error.message}` });
     }
 };
 
@@ -109,15 +124,6 @@ const updateVideo = async (req, res) => {
         const parsedVideoid = parseInt(videoid);
         if (isNaN(parsedVideoid) || parsedVideoid <= 0) {
             return res.status(400).json({ error: 'ID video không hợp lệ.' });
-        }
-
-        const video = await VideoService.getVideoById(parsedVideoid, userid);
-        if (!video) {
-            return res.status(404).json({ error: 'Không tìm thấy video.' });
-        }
-
-        if (video.userid !== userid) {
-            return res.status(403).json({ error: 'Bạn không có quyền cập nhật video này.' });
         }
 
         const updatedVideo = await VideoService.updateVideo(parsedVideoid, req.body);
@@ -289,6 +295,36 @@ const getVideosByUserId = async (req, res) => {
     }
 };
 
+const getMyVideos = async (req, res) => {
+    try {
+        const userid = parseInt(req.params.userid);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const status = req.query.status !== undefined ? parseInt(req.query.status) : undefined;
+
+        // Kiểm tra userid
+        if (isNaN(userid) || userid <= 0) {
+            return res.status(400).json({ error: 'ID người dùng không hợp lệ.' });
+        }
+        if (isNaN(page) || page < 1 || isNaN(limit) || limit < 1) {
+            return res.status(400).json({ error: 'Trang hoặc giới hạn không hợp lệ.' });
+        }
+        if (status !== undefined && ![0, 1].includes(status)) {
+            return res.status(400).json({ error: 'Trạng thái không hợp lệ.' });
+        }
+
+        const videos = await VideoService.getMyVideos(userid, page, limit, status);
+        res.status(200).json({
+            status: 'OK',
+            message: 'Lấy video thành công',
+            data: videos,
+        });
+    } catch (error) {
+        console.error('❌ Controller: Error fetching videos by user ID:', error.message);
+        res.status(500).json({ error: 'Không thể lấy video của người dùng.' });
+    }
+};
+
 module.exports = {
     uploadVideo,
     getAllVideos,
@@ -298,5 +334,6 @@ module.exports = {
     searchVideos,
     incrementView,
     getVideosByType,
-    getVideosByUserId
+    getVideosByUserId,
+    getMyVideos
 };

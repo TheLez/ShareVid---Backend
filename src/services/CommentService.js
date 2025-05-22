@@ -12,7 +12,10 @@ const getAllComments = async () => {
 
 const getCommentsByVideoId = async (videoid, limit, offset) => {
     return await CommentModel.findAll({
-        where: { videoid },
+        where: {
+            videoid,
+            status: 1
+        },
         include: [{
             model: AccountModel,
             attributes: ['userid', 'name', 'avatar'],

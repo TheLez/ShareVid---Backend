@@ -154,19 +154,32 @@ const uploadVideo = async (videoFile, thumbnailFile = null, videoData) => {
     }
 };
 
-const getAllVideos = async (videotype = null, page = 1, limit = 50, excludeId = null, orderByView = false) => {
+const getAllVideos = async (videotype = null, page = 1, limit = 50, excludeId = null, orderByView = false, search = null) => {
+    console.log('Service: getAllVideos called'); // Debug
     try {
         const offset = (page - 1) * limit;
 
         const whereCondition = {
-            status: 1, // Chỉ lấy video đang hoạt động
-            ...(videotype !== null && { videotype }), // Nếu có videotype, thêm vào điều kiện
-            ...(excludeId && { videoid: { [Op.ne]: excludeId } }) // Loại trừ video hiện tại nếu có
+            status: 1,
+            ...(videotype !== null && { videotype }),
+            ...(excludeId && { videoid: { [Op.ne]: excludeId } }),
         };
 
+        if (search) {
+            const searchNum = parseInt(search);
+            const searchConditions = [];
+            if (!isNaN(searchNum)) {
+                searchConditions.push({ videoid: searchNum });
+            }
+            searchConditions.push({ title: { [Op.like]: `%${search.replace(/[%_]/g, '\\$&')}%` } });
+            whereCondition[Op.or] = searchConditions;
+        }
+
         const orderCondition = orderByView
-            ? [['videoview', 'DESC'], ['created_at', 'DESC'], ['videoid', 'DESC']] // Sắp xếp theo lượt xem trước, sau đó theo ngày tạo
-            : [['created_at', 'DESC'], ['videoid', 'DESC']]; // Mặc định sắp xếp theo ngày tạo mới nhất
+            ? [['videoview', 'DESC'], ['created_at', 'DESC'], ['videoid', 'DESC']]
+            : [['created_at', 'DESC'], ['videoid', 'DESC']];
+
+        console.log('Service: whereCondition:', JSON.stringify(whereCondition)); // Debug
 
         const { count, rows } = await VideoModel.findAndCountAll({
             where: whereCondition,
@@ -177,6 +190,7 @@ const getAllVideos = async (videotype = null, page = 1, limit = 50, excludeId = 
             order: orderCondition,
             limit,
             offset,
+            logging: console.log // Log SQL query
         });
 
         return {
@@ -188,10 +202,10 @@ const getAllVideos = async (videotype = null, page = 1, limit = 50, excludeId = 
             totalPages: Math.ceil(count / limit),
         };
     } catch (error) {
-        console.error('Error fetching all videos:', error);
+        console.error('❌ Service: Error fetching videos:', error.message, error.stack);
         return {
             status: 'ERROR',
-            message: 'Lấy tất cả video thất bại',
+            message: `Lấy tất cả video thất bại: ${error.message}`,
         };
     }
 };
@@ -225,7 +239,7 @@ const getVideoById = async (videoid, userid) => {
 
         // Tìm video theo videoid
         const video = await VideoModel.findOne({
-            where: { videoid: parsedVideoid, status: 1 }, // Chỉ lấy video có status = 1
+            where: { videoid: parsedVideoid }, // Chỉ lấy video có status = 1
             include: [
                 {
                     model: AccountModel,
@@ -439,6 +453,35 @@ const getVideosByUserId = async (userid, page = 1, limit = 20) => {
     return videos;
 };
 
+const getMyVideos = async (userid, page = 1, limit = 20, status) => {
+    const offset = (page - 1) * limit;
+
+    const where = { userid };
+    if (status !== undefined) {
+        where.status = status;
+    }
+
+    const videos = await VideoModel.findAll({
+        where,
+        order: [['created_at', 'DESC']],
+        limit,
+        offset,
+        include: [
+            {
+                model: AccountModel,
+                attributes: ['name', 'email', 'avatar', 'subscription'],
+            },
+            {
+                model: LikevideoModel,
+                attributes: [],
+                required: false,
+            },
+        ],
+    });
+
+    return videos;
+};
+
 module.exports = {
     uploadVideo,
     getAllVideos,
@@ -448,5 +491,6 @@ module.exports = {
     searchVideos,
     incrementView,
     getVideosByType,
-    getVideosByUserId
+    getVideosByUserId,
+    getMyVideos
 };

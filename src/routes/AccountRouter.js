@@ -13,8 +13,9 @@ router.get('/get-all', authMiddleware, accountController.getAllAccount);
 router.get('/get-account/:id', authMiddleware, accountController.getAccountById);
 router.post('/sign-up', upload.single('avatar'), accountController.createAccount); // Thêm multer vào đây
 router.post('/sign-in', accountController.loginAccount);
-router.put('/update-account/:id', authMiddleware, accountController.updateAccount);
+router.put('/update-account/:id', authMiddleware, upload.single('avatar'), accountController.updateAccount);
 router.delete('/delete-account/:id', authMiddleware, accountController.deleteAccount);
 router.get('/get/search', accountController.searchAccounts);
+router.patch('/update', authMiddleware, upload.single('avatar'), accountController.updateAccountHandler);
 
 module.exports = router;

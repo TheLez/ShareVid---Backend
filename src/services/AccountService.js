@@ -115,6 +115,7 @@ const loginAccount = (loginAccount) => {
                     id: checkAccount.userid,
                     name: checkAccount.name, // Giả sử bạn có trường name trong model
                     role: checkAccount.role,
+                    avatar: checkAccount.avatar
                     // Thêm các thông tin khác nếu cần
                 }
             });
@@ -124,10 +125,49 @@ const loginAccount = (loginAccount) => {
     });
 };
 
-const updateAccount = async (userid, updateData) => {
+const updateAccountById = async (userid, updateData, file) => {
     try {
-        const [updatedCount] = await AccountModel.update(updateData, {
-            where: { userid: userid }
+        let avatarUrl = updateData.avatar; // Giữ avatar từ updateData nếu có
+
+        // Nếu có file ảnh, tải lên S3
+        if (file) {
+            console.log(`Uploading avatar for userid: ${userid}`);
+            const avatarKey = `avatars/${userid}/${Date.now()}_${file.originalname}`;
+            const s3Response = await s3.upload({
+                Bucket: process.env.S3_BUCKET,
+                Key: avatarKey,
+                Body: file.buffer,
+                ContentType: file.mimetype,
+            }).promise();
+
+            avatarUrl = s3Response.Location;
+            console.log(`Avatar uploaded to S3: ${avatarUrl}`);
+        }
+
+        const updatePayload = {
+            name: updateData.name,
+            gender: updateData.gender,
+            birth: updateData.birth,
+            email: updateData.email,
+            role: updateData.role,
+            status: updateData.status,
+            avatar: avatarUrl,
+            accountdescribe: updateData.accountdescribe
+        };
+
+        // Loại bỏ các trường undefined
+        Object.keys(updatePayload).forEach(key => updatePayload[key] === undefined && delete updatePayload[key]);
+
+        // Kiểm tra status hợp lệ
+        if (updatePayload.status !== undefined && ![0, 1].includes(updatePayload.status)) {
+            return {
+                status: 'ERROR',
+                message: 'Trạng thái không hợp lệ, phải là 0 hoặc 1.'
+            };
+        }
+
+        const [updatedCount] = await AccountModel.update(updatePayload, {
+            where: { userid }
         });
 
         if (updatedCount === 0) {
@@ -138,7 +178,7 @@ const updateAccount = async (userid, updateData) => {
         }
 
         const updatedAccount = await AccountModel.findOne({
-            where: { userid: userid }
+            where: { userid }
         });
 
         return {
@@ -147,7 +187,11 @@ const updateAccount = async (userid, updateData) => {
             data: updatedAccount
         };
     } catch (error) {
-        throw new Error('Cập nhật tài khoản thất bại');
+        console.error('Service: Error updating account by id:', error);
+        return {
+            status: 'ERROR',
+            message: `Cập nhật tài khoản thất bại: ${error.message}`
+        };
     }
 };
 
@@ -174,15 +218,51 @@ const deleteAccount = async (userid) => {
     }
 };
 
-const getAllAccount = async () => {
+const getAllAccount = async ({ page = 1, limit = 10, search = '' }) => {
     try {
-        const allAccount = await AccountModel.findAll();
+        const offset = (page - 1) * limit;
+        const where = search ? {
+            [Op.or]: [
+                { userid: search }, // Tìm chính xác userid
+                { name: { [Op.like]: `%${search}%` } } // Tìm gần đúng name
+            ]
+        } : {};
+
+        const { count, rows } = await AccountModel.findAndCountAll({
+            where,
+            offset,
+            limit,
+            attributes: [
+                'userid',
+                'name',
+                'email',
+                'role',
+                'status',
+                'created_at',
+                'gender',
+                'birth',
+                'avatar',
+                'accountdescribe',
+                'subscription'
+            ],
+            order: [
+                ['created_at', 'DESC'],
+                ['userid', 'DESC']
+            ]
+        });
+
         return {
             status: 'OK',
             message: 'Lấy danh sách tài khoản thành công',
-            data: allAccount
+            data: {
+                accounts: rows,
+                total: count,
+                page,
+                limit
+            }
         };
     } catch (e) {
+        console.error('Error fetching accounts:', e);
         throw new Error('Lỗi khi lấy danh sách tài khoản: ' + e.message);
     }
 };
@@ -256,6 +336,43 @@ const searchAccounts = async (query, page, limit) => {
     }
 };
 
+const updateAccount = async (userid, data, file) => {
+    try {
+        console.log(`Updating account for userid: ${userid}, data:`, data);
+        const account = await AccountModel.findOne({ where: { userid: userid } });
+        if (!account) throw new Error('Account not found');
+
+        let avatarUrl = data.avatar || account.avatar; // Giữ avatar hiện tại nếu không có thay đổi
+
+        // Nếu có file ảnh, tải lên S3
+        if (file) {
+            console.log(`Uploading avatar for userid: ${userid}`);
+            const avatarKey = `avatars/${file.originalname}`;
+            const s3Response = await s3.upload({
+                Bucket: process.env.S3_BUCKET,
+                Key: avatarKey,
+                Body: file.buffer,
+                ContentType: file.mimetype,
+            }).promise();
+
+            avatarUrl = s3Response.Location;
+            console.log(`Avatar uploaded to S3: ${avatarUrl}`);
+        }
+
+        await account.update({
+            name: data.name,
+            avatar: avatarUrl,
+            accountdescribe: data.accountdescribe
+        });
+
+        console.log(`Account updated: ${userid}`);
+        return account;
+    } catch (error) {
+        console.error('Error updating account:', error);
+        throw new Error(`Failed to update account: ${error.message}`);
+    }
+};
+
 module.exports = {
     getAllAccount,
     getAccountById,
@@ -263,5 +380,6 @@ module.exports = {
     loginAccount,
     updateAccount,
     deleteAccount,
-    searchAccounts
+    searchAccounts,
+    updateAccountById
 };
