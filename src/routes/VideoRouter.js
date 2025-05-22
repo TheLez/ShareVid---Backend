@@ -10,7 +10,15 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 // Route upload video: cần xác thực
-router.post('/upload', authMiddleware, upload.single('video'), videoController.uploadVideo);
+router.post(
+    '/upload',
+    authMiddleware,
+    upload.fields([
+        { name: 'video', maxCount: 1 },
+        { name: 'thumbnail', maxCount: 1 }
+    ]),
+    videoController.uploadVideo
+);
 
 // Route lấy tất cả video: không cần xác thực
 router.get('/get-all', videoController.getAllVideos);

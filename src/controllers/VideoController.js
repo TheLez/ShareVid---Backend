@@ -7,7 +7,10 @@ const uploadVideo = async (req, res) => {
             return res.status(401).json({ error: 'Yêu cầu xác thực.' });
         }
 
-        if (!req.file) {
+        const videoFile = req.files?.video?.[0];
+        const thumbnailFile = req.files?.thumbnail?.[0];
+
+        if (!videoFile) {
             return res.status(400).json({ error: 'Tệp video là bắt buộc.' });
         }
 
@@ -28,9 +31,7 @@ const uploadVideo = async (req, res) => {
             return res.status(400).json({ error: 'Tiêu đề video là bắt buộc.' });
         }
 
-        const thumbnail = req.body.thumbnail || null;
-
-        const video = await VideoService.uploadVideo(req.file, thumbnail, videoData);
+        const video = await VideoService.uploadVideo(videoFile, thumbnailFile, videoData);
         res.status(201).json(video);
     } catch (error) {
         console.error('❌ Controller: Error uploading video:', error.message);
