@@ -8,6 +8,7 @@ const LikeCommentRouter = require('./LikeCommentRouter');
 const SaveVideoRouter = require('./SaveVideoRouter');
 const NotificationRouter = require('./NotificationRouter');
 const authRouter = require('./authRouter');
+const ffmpegRouter = require('./FfmpegRouter');
 
 const routes = (app) => {
     app.use('/api/account', AccountRouter);
@@ -20,6 +21,7 @@ const routes = (app) => {
     app.use('/api/save-video', SaveVideoRouter);
     app.use('/api/notification', NotificationRouter);
     app.use('/api/auth', authRouter);
+    app.use('/api/ffmpeg', ffmpegRouter);
 }
 
 module.exports = routes

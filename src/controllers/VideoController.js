@@ -160,12 +160,12 @@ const deleteVideo = async (req, res) => {
             return res.status(404).json({ error: 'Không tìm thấy video.' });
         }
 
-        if (video.userid !== userid) {
-            return res.status(403).json({ error: 'Bạn không có quyền xóa video này.' });
-        }
+        // if (video.userid !== userid) {
+        //     return res.status(403).json({ error: 'Bạn không có quyền xóa video này.' });
+        // }
 
         await VideoService.deleteVideo(parsedVideoid);
-        res.status(204).send();
+        res.status(200).send();
     } catch (error) {
         console.error('❌ Controller: Error deleting video:', error.message);
         if (error.message === 'Invalid video ID') {
