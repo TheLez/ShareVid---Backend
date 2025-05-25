@@ -40,6 +40,10 @@ class FfmpegService {
                     }
                 });
                 videoOutput = currentVideoOutput;
+            } else {
+                // Nếu không có ảnh, thêm bộ lọc giả để đảm bảo luồng video được định nghĩa
+                filterParts.push(`[0:v]null[v_filtered]`);
+                videoOutput = 'v_filtered';
             }
 
             // Xử lý tốc độ video
