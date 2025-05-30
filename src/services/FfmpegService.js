@@ -4,13 +4,14 @@ const fs = require('fs');
 
 ffmpeg.setFfmpegPath(require('ffmpeg-static'));
 
-class FfmpegService {
+class FffmpegService {
     async processVideo({ videoPath, imagePaths, audioPath, params, outputPath }) {
-        const { startTime, endTime, speed, volume, imagePropsArray, audioProps } = params;
+        const { startTime, endTime, speed, volume, imagePropsArray, textPropsArray, audioProps } = params;
 
         console.log('Processing video with params:', params);
         console.log('imagePaths:', imagePaths);
         console.log('imagePropsArray:', imagePropsArray);
+        console.log('textPropsArray:', textPropsArray);
 
         return new Promise((resolve, reject) => {
             const command = ffmpeg()
@@ -27,7 +28,7 @@ class FfmpegService {
                     if (index < imagePropsArray.length) {
                         command.input(imagePaths[index]);
                         const { x, y, width, height, startTime: imgStart, endTime: imgEnd } = imagePropsArray[index];
-                        filterParts.push(`[${index + 1}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[scaled${index}]`);
+                        filterParts.push(`[${index + 1}:v]scale=${width}:${height}[scaled${index}]`);
                     }
                 });
 
@@ -44,6 +45,20 @@ class FfmpegService {
                 // Nếu không có ảnh, thêm bộ lọc giả để đảm bảo luồng video được định nghĩa
                 filterParts.push(`[0:v]null[v_filtered]`);
                 videoOutput = 'v_filtered';
+            }
+
+            // Xử lý chèn văn bản
+            if (textPropsArray && textPropsArray.length > 0) {
+                let currentVideoOutput = videoOutput;
+                textPropsArray.forEach((textProps, index) => {
+                    const { text, x, y, fontsize, fontcolor, startTime: textStart, endTime: textEnd } = textProps;
+                    // Thoát các ký tự đặc biệt trong văn bản (như dấu hai chấm, dấu nháy đơn)
+                    const escapedText = text.replace(/'/g, "\\'").replace(/:/g, "\\:");
+                    // Không chỉ định fontfile, FFmpeg sẽ dùng font mặc định (Times New Roman trên Windows)
+                    filterParts.push(`[${currentVideoOutput}]drawtext=text='${escapedText}':x=${x}:y=${y}:fontsize=${fontsize}:fontcolor=${fontcolor}:enable='between(t,${textStart},${textEnd})'[v_text${index}]`);
+                    currentVideoOutput = `v_text${index}`;
+                });
+                videoOutput = currentVideoOutput;
             }
 
             // Xử lý tốc độ video
@@ -128,4 +143,4 @@ class FfmpegService {
     }
 }
 
-module.exports = new FfmpegService();
+module.exports = new FffmpegService();

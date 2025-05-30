@@ -4,16 +4,12 @@ const FfmpegService = require('../services/FfmpegService');
 class FfmpegController {
     async processVideo(req, res) {
         try {
-            const { video, image0, image1, image2, audio } = req.files;
+            const { video, images, audio } = req.files;
             const { params } = req.body;
 
             const parsedParams = JSON.parse(params);
             const videoPath = video ? video[0].path : null;
-            const imagePaths = [
-                image0 ? image0[0].path : null,
-                image1 ? image1[0].path : null,
-                image2 ? image2[0].path : null,
-            ].filter(path => path !== null);
+            const imagePaths = images ? images.map(img => img.path) : [];  // Lấy mảng đường dẫn ảnh
             const audioPath = audio ? audio[0].path : null;
             const outputPath = path.join(__dirname, '..', '..', 'outputs', `output-${Date.now()}.mp4`);
 
@@ -39,13 +35,12 @@ class FfmpegController {
         } catch (error) {
             console.error('Lỗi xử lý video:', error);
             res.status(500).send('Lỗi xử lý video.');
-            FfmpegService.cleanUp([
+            const filesToClean = [
                 req.files.video ? req.files.video[0].path : null,
-                req.files.image0 ? req.files.image0[0].path : null,
-                req.files.image1 ? req.files.image1[0].path : null,
-                req.files.image2 ? req.files.image2[0].path : null,
+                ...(req.files.images ? req.files.images.map(img => img.path) : []),
                 req.files.audio ? req.files.audio[0].path : null,
-            ]);
+            ].filter(path => path !== null);
+            FffmpegService.cleanUp(filesToClean);
         }
     }
 }
