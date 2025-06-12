@@ -4,7 +4,7 @@ const fs = require('fs');
 
 ffmpeg.setFfmpegPath(require('ffmpeg-static'));
 
-class FffmpegService {
+class FfmpegService {
     async processVideo({ videoPath, imagePaths, audioPath, params, outputPath }) {
         const { startTime, endTime, speed, volume, imagePropsArray, textPropsArray, audioProps } = params;
 
@@ -19,8 +19,8 @@ class FffmpegService {
                 .setStartTime(startTime || 0);
 
             const filterParts = [];
-            let videoOutput = '0:v'; // Nhãn không bao gồm dấu ngoặc
-            let audioOutput = '0:a'; // Nhãn không bao gồm dấu ngoặc
+            let videoOutput = '0:v';
+            let audioOutput = '0:a';
 
             // Xử lý video và chèn ảnh
             if (imagePaths && imagePaths.length > 0 && imagePropsArray && imagePropsArray.length > 0) {
@@ -37,12 +37,11 @@ class FffmpegService {
                     if (index < imagePropsArray.length) {
                         const { x, y, startTime: imgStart, endTime: imgEnd } = imagePropsArray[index];
                         filterParts.push(`[${currentVideoOutput}][scaled${index}]overlay=${x}:${y}:enable='between(t,${imgStart},${imgEnd})'[v${index}]`);
-                        currentVideoOutput = `v${index}`; // Lưu nhãn không có dấu ngoặc
+                        currentVideoOutput = `v${index}`;
                     }
                 });
                 videoOutput = currentVideoOutput;
             } else {
-                // Nếu không có ảnh, thêm bộ lọc giả để đảm bảo luồng video được định nghĩa
                 filterParts.push(`[0:v]null[v_filtered]`);
                 videoOutput = 'v_filtered';
             }
@@ -51,11 +50,12 @@ class FffmpegService {
             if (textPropsArray && textPropsArray.length > 0) {
                 let currentVideoOutput = videoOutput;
                 textPropsArray.forEach((textProps, index) => {
-                    const { text, x, y, fontsize, fontcolor, startTime: textStart, endTime: textEnd } = textProps;
-                    // Thoát các ký tự đặc biệt trong văn bản (như dấu hai chấm, dấu nháy đơn)
+                    const { text, x, y, fontsize, fontcolor, startTime: textStart, endTime: textEnd, font } = textProps;
                     const escapedText = text.replace(/'/g, "\\'").replace(/:/g, "\\:");
-                    // Không chỉ định fontfile, FFmpeg sẽ dùng font mặc định (Times New Roman trên Windows)
-                    filterParts.push(`[${currentVideoOutput}]drawtext=text='${escapedText}':x=${x}:y=${y}:fontsize=${fontsize}:fontcolor=${fontcolor}:enable='between(t,${textStart},${textEnd})'[v_text${index}]`);
+                    const drawtextFilter = `[${currentVideoOutput}]drawtext=font='${font}':text='${escapedText}':x=${x}:y=${y}:fontsize=${fontsize}:fontcolor=${fontcolor}:enable='between(t,${textStart},${textEnd})'[v_text${index}]`;
+
+                    console.log(`Using font '${font}' for text overlay.`);
+                    filterParts.push(drawtextFilter);
                     currentVideoOutput = `v_text${index}`;
                 });
                 videoOutput = currentVideoOutput;
@@ -65,7 +65,6 @@ class FffmpegService {
             if (speed !== 1) {
                 filterParts.push(`[${videoOutput}]setpts=PTS/${speed}[v_speed]`);
                 videoOutput = 'v_speed';
-                // Điều chỉnh tốc độ âm thanh gốc
                 filterParts.push(`[0:a]atempo=${speed}[a_speed]`);
                 audioOutput = 'a_speed';
             }
@@ -76,16 +75,12 @@ class FffmpegService {
                 const audioIndex = (imagePaths ? imagePaths.length : 0) + 1;
                 const { startTime: audioStart, endTime: audioEnd } = audioProps;
 
-                // Resample âm thanh gốc
                 filterParts.push(`[${audioOutput}]aresample=48000[a_original]`);
-                // Trim và resample âm thanh bổ sung
                 filterParts.push(`[${audioIndex}:a]atrim=start=${audioStart}:end=${audioEnd}[a_trimmed]`);
                 filterParts.push(`[a_trimmed]aresample=48000[a_additional]`);
-                // Trộn âm thanh
                 filterParts.push(`[a_original][a_additional]amix=inputs=2:duration=first[a_mix]`);
                 audioOutput = 'a_mix';
             } else {
-                // Chỉ sử dụng âm thanh gốc
                 filterParts.push(`[${audioOutput}]aresample=48000[a_original]`);
                 audioOutput = 'a_original';
             }
@@ -143,4 +138,4 @@ class FffmpegService {
     }
 }
 
-module.exports = new FffmpegService();
+module.exports = new FfmpegService();
