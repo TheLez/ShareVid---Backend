@@ -2,23 +2,57 @@ const SubscribeModel = require('../models/SubscribeModel');
 const VideoModel = require('../models/VideoModel');
 const AccountModel = require('../models/AccountModel');
 const { Sequelize, Op } = require('sequelize');
+const NotificationModel = require('../models/NotificationModel');
+const { sequelize } = require('../models'); // Import sequelize instance
 
 // Thêm subscription
 const addSubscription = async (userid, useridsub) => {
-    const existingSubscription = await SubscribeModel.findOne({
-        where: { userid, useridsub }
-    });
+    const transaction = await sequelize.transaction();
+    try {
+        // Kiểm tra xem đã đăng ký chưa
+        const existingSubscription = await SubscribeModel.findOne({
+            where: { userid, useridsub },
+            transaction,
+        });
 
-    if (existingSubscription) {
-        throw new Error('Subscription already exists');
+        if (existingSubscription) {
+            throw new Error('Subscription already exists');
+        }
+
+        // Tạo bản ghi đăng ký mới
+        const newSubscription = await SubscribeModel.create({
+            userid,
+            useridsub,
+        }, { transaction });
+
+        // Lấy tên người dùng từ AccountModel
+        const user = await AccountModel.findByPk(userid, {
+            attributes: ['name'],
+            transaction,
+        });
+
+        if (!user) {
+            throw new Error('Người dùng không tồn tại');
+        }
+
+        // Tạo thông báo cho chủ kênh
+        const content = `Người dùng ${user.name} đã đăng ký kênh của bạn`;
+
+        await NotificationModel.create({
+            content,
+            created_at: new Date(),
+            status: 0, // Chưa đọc
+            userid: useridsub,
+        }, { transaction });
+
+        console.log(`🔍 Service: Đã tạo đăng ký và thông báo cho kênh ${useridsub}, người đăng ký: ${user.name}`);
+        await transaction.commit();
+        return newSubscription;
+    } catch (error) {
+        await transaction.rollback();
+        console.error(`❌ Service: Lỗi khi thêm đăng ký: ${error.message}`);
+        throw error;
     }
-
-    const newSubscription = await SubscribeModel.create({
-        userid,
-        useridsub,
-    });
-
-    return newSubscription;
 };
 
 // Lấy tất cả subscriptions của người dùng

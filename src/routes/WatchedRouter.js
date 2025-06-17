@@ -13,4 +13,6 @@ router.post('/add', authMiddleware, watchedController.addWatched);
 // Route xóa bản ghi đã xem: cần xác thực
 router.delete('/delete/:videoid', authMiddleware, watchedController.deleteWatched);
 
+router.put('/update/:watchedid', authMiddleware, watchedController.updateWatched);
+
 module.exports = router;

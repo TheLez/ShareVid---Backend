@@ -1,6 +1,8 @@
 const LikeVideoModel = require('../models/LikevideoModel'); // Import model LikeVideo
 const VideoModel = require('../models/VideoModel'); // Import model Video
 const AccountModel = require('../models/AccountModel'); // Import model Account
+const NotificationModel = require('../models/NotificationModel'); // Import model Notification
+const { sequelize } = require('../models'); // Import sequelize instance
 
 const getLikedVideos = async (userid, page, limit) => {
     try {
@@ -75,23 +77,67 @@ const getLikedVideos = async (userid, page, limit) => {
     }
 };
 
-const addLike = async (userid, videoid, type) => { // ✅ Nhận type
-    const existingLike = await LikeVideoModel.findOne({
-        where: { userid, videoid }
-    });
+const addLike = async (userid, videoid, type) => {
+    const transaction = await sequelize.transaction();
+    try {
+        // Kiểm tra xem đã có like/dislike chưa
+        const existingLike = await LikeVideoModel.findOne({
+            where: { userid, videoid },
+            transaction,
+        });
 
-    if (existingLike) {
-        throw new Error('Like already exists');
+        if (existingLike) {
+            throw new Error('Like already exists');
+        }
+
+        // Tạo bản ghi like mới
+        const newLike = await LikeVideoModel.create({
+            userid,
+            videoid,
+            type,
+            created_at: new Date(),
+        }, { transaction });
+
+        // Lấy userid của người đăng video
+        const video = await VideoModel.findByPk(videoid, {
+            attributes: ['userid'],
+            transaction,
+        });
+
+        if (!video) {
+            throw new Error('Video không tồn tại');
+        }
+
+        // Lấy tên người dùng từ AccountModel
+        const user = await AccountModel.findByPk(userid, {
+            attributes: ['name'],
+            transaction,
+        });
+
+        if (!user) {
+            throw new Error('Người dùng không tồn tại');
+        }
+
+        // Tạo thông báo cho người đăng video
+        const content = type === 1 
+            ? `Người dùng ${user.name} đã thích video của bạn`
+            : `Người dùng ${user.name} đã không thích video của bạn`;
+
+        await NotificationModel.create({
+            content,
+            created_at: new Date(),
+            status: 0, // Chưa đọc
+            userid: video.userid,
+        }, { transaction });
+
+        console.log(`🔍 Service: Đã tạo like (type: ${type}) và thông báo cho video ${videoid}, chủ sở hữu: ${video.userid}`);
+        await transaction.commit();
+        return newLike;
+    } catch (error) {
+        await transaction.rollback();
+        console.error(`❌ Service: Lỗi khi thêm like: ${error.message}`);
+        throw error;
     }
-
-    const newLike = await LikeVideoModel.create({
-        userid,
-        videoid,
-        type,
-        created_at: new Date(),
-    });
-
-    return newLike;
 };
 
 const removeLike = async (userid, videoid) => {

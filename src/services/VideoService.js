@@ -218,25 +218,6 @@ const getVideoById = async (videoid, userid) => {
             throw new Error('Invalid video ID');
         }
 
-        // Kiểm tra xem bản ghi đã tồn tại trong bảng watched hay chưa
-        if (userid) {
-            const existingRecord = await WatchedModel.findOne({
-                where: { userid: userid, videoid: parsedVideoid }
-            });
-
-            if (!existingRecord) {
-                // Nếu không tồn tại, tạo bản ghi mới
-                await WatchedModel.create({
-                    userid: userid,
-                    videoid: parsedVideoid,
-                    created_at: new Date()
-                });
-            } else {
-                // Nếu đã tồn tại, chỉ cập nhật created_at
-                await existingRecord.update({ created_at: new Date() });
-            }
-        }
-
         // Tìm video theo videoid
         const video = await VideoModel.findOne({
             where: { videoid: parsedVideoid }, // Chỉ lấy video có status = 1
